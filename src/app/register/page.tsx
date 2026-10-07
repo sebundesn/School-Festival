@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { OrderItem } from "../type/Order";
+import { useEffect, useState } from "react";
+import { Order, OrderItem } from "../type/Order";
 import { MENU_ITEMS } from "@/lib/menu";
-import { placeOrder } from "@/lib/orders";
+import { placeOrder, cancelOrder, subscribeAllOrders } from "@/lib/orders";
 
 function buildInitialCart(): Record<string, number> {
   return Object.fromEntries(MENU_ITEMS.map((item) => [item.id, 0]));
@@ -14,6 +14,18 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastOrderNumber, setLastOrderNumber] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    return subscribeAllOrders((orders) => setRecentOrders(orders.slice(-5).reverse()));
+  }, []);
+
+  async function handleCancel(order: Order) {
+    const label = `#${String(order.orderNumber).padStart(3, "0")}`;
+    if (!window.confirm(`${label} の注文を取り消します。よろしいですか？`)) return;
+    await cancelOrder(order.id);
+  }
 
   const cart: OrderItem[] = MENU_ITEMS.filter((item) => quantities[item.id] > 0).map(
     (item) => ({
@@ -99,6 +111,35 @@ export default function RegisterPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4 flex flex-col gap-2">
+        <h2 className="font-semibold text-neutral-600">直近の注文（会計ミスの取消）</h2>
+        {recentOrders.length === 0 && <p className="text-neutral-400">注文はまだありません</p>}
+        {recentOrders.map((order) => {
+          const cancelled = order.status === "cancelled";
+          return (
+            <div key={order.id} className="flex items-center justify-between gap-3">
+              <span className={cancelled ? "line-through text-neutral-400" : ""}>
+                <span className="font-mono font-bold">
+                  #{String(order.orderNumber).padStart(3, "0")}
+                </span>{" "}
+                ¥{order.totalAmount}
+              </span>
+              {cancelled ? (
+                <span className="text-sm text-neutral-400">取消済み</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleCancel(order)}
+                  className="rounded-lg bg-red-100 text-red-700 font-bold px-3 py-1 active:bg-red-200"
+                >
+                  取消
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-auto rounded-xl bg-white border border-neutral-300 px-5 py-4 flex flex-col gap-3">

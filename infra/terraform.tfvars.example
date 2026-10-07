@@ -1,0 +1,4 @@
+staff_token  = "change-me-long-random-string"
+alert_email  = "you@example.com"
+budget_usd   = 10
+protect_data = true

@@ -1,4 +1,4 @@
-export type OrderStatus = "cooking" | "ready" | "completed";
+export type OrderStatus = "cooking" | "ready" | "completed" | "cancelled";
 
 export interface OrderItem {
   menuId: string;

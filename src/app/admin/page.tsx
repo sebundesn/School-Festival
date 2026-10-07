@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Order } from "../type/Order";
-import { subscribeAllOrders, resetCounter } from "@/lib/orders";
+import { subscribeAllOrders, resetCounter, buildCsv } from "@/lib/orders";
 import { MENU_ITEMS } from "@/lib/menu";
 
 export default function AdminPage() {
@@ -14,21 +14,33 @@ export default function AdminPage() {
   }, []);
 
   const summary = useMemo(() => {
-    const totalAmount = orders.reduce((sum, order) => sum + order.totalAmount, 0);
-    const totalCount = orders.reduce(
+    const cancelledCount = orders.filter((o) => o.status === "cancelled").length;
+    const valid = orders.filter((o) => o.status !== "cancelled");
+    const totalAmount = valid.reduce((sum, order) => sum + order.totalAmount, 0);
+    const totalCount = valid.reduce(
       (sum, order) => sum + order.items.reduce((s, item) => s + item.quantity, 0),
       0
     );
 
     const countByMenu = new Map<string, number>();
-    for (const order of orders) {
+    for (const order of valid) {
       for (const item of order.items) {
         countByMenu.set(item.menuId, (countByMenu.get(item.menuId) ?? 0) + item.quantity);
       }
     }
 
-    return { totalAmount, totalCount, countByMenu, orderCount: orders.length };
+    return { totalAmount, totalCount, countByMenu, orderCount: valid.length, cancelledCount };
   }, [orders]);
+
+  function handleExportCsv() {
+    const blob = new Blob([buildCsv(orders)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "orders.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function handleResetCounter() {
     if (!window.confirm("整理券番号のカウンターを 0 にリセットします。よろしいですか？")) {
@@ -44,7 +56,11 @@ export default function AdminPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="総売上額" value={`¥${summary.totalAmount.toLocaleString()}`} />
         <StatCard label="累計販売本数" value={`${summary.totalCount}本`} />
-        <StatCard label="注文件数" value={`${summary.orderCount}件`} />
+        <StatCard
+          label="注文件数"
+          value={`${summary.orderCount}件`}
+          note={summary.cancelledCount > 0 ? `取消 ${summary.cancelledCount}件を除く` : undefined}
+        />
       </div>
 
       <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4">
@@ -59,6 +75,17 @@ export default function AdminPage() {
             </li>
           ))}
         </ul>
+      </div>
+
+      <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4 flex items-center justify-between">
+        <p className="font-semibold">注文データのCSV出力</p>
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          className="rounded-xl bg-neutral-800 text-white font-bold px-5 py-3 active:bg-neutral-900"
+        >
+          ダウンロード
+        </button>
       </div>
 
       <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4 flex items-center justify-between">
@@ -80,11 +107,12 @@ export default function AdminPage() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4">
       <p className="text-neutral-500">{label}</p>
       <p className="text-3xl font-bold tabular-nums">{value}</p>
+      {note && <p className="text-neutral-400 text-sm">{note}</p>}
     </div>
   );
 }
