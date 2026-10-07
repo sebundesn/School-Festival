@@ -1,5 +1,3 @@
-import { Timestamp } from "firebase/firestore";
-
 export type OrderStatus = "cooking" | "ready" | "completed";
 
 export interface OrderItem {
@@ -15,5 +13,5 @@ export interface Order {
   items: OrderItem[];
   totalAmount: number;
   status: OrderStatus;
-  createdAt: Timestamp | null;
+  createdAt: Date | null;
 }
