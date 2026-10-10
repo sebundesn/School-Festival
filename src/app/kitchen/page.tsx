@@ -58,8 +58,8 @@ export default function KitchenPage() {
     <main className="min-h-screen bg-neutral-100 p-6 flex flex-col gap-6">
       <h1 className="text-2xl font-bold">厨房・ステータス管理</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <section className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <section className="md:col-span-3 flex flex-col gap-3">
           <h2 className="text-xl font-semibold text-orange-600">🔥 調理中</h2>
           {cookingOrders.length === 0 && (
             <p className="text-neutral-400">調理中の注文はありません</p>
@@ -69,13 +69,13 @@ export default function KitchenPage() {
           ))}
         </section>
 
-        <section className="flex flex-col gap-3">
+        <section className="md:col-span-2 flex flex-col gap-3">
           <h2 className="text-xl font-semibold text-emerald-600">🔔 呼出中</h2>
           {readyOrders.length === 0 && (
             <p className="text-neutral-400">呼出中の注文はありません</p>
           )}
           {readyOrders.map((order) => (
-            <OrderCard key={order.id} order={order} onAdvance={advanceStatus} />
+            <OrderCard key={order.id} order={order} />
           ))}
         </section>
       </div>
@@ -103,10 +103,8 @@ function OrderCard({
   onAdvance,
 }: {
   order: Order;
-  onAdvance: (order: Order) => void;
+  onAdvance?: (order: Order) => void;
 }) {
-  const isCooking = order.status === "cooking";
-
   return (
     <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4 flex items-center justify-between gap-4">
       <div>
@@ -121,15 +119,15 @@ function OrderCard({
           ))}
         </ul>
       </div>
-      <button
-        type="button"
-        onClick={() => onAdvance(order)}
-        className={`rounded-xl text-white font-bold px-5 py-3 active:opacity-80 ${
-          isCooking ? "bg-emerald-600" : "bg-blue-600"
-        }`}
-      >
-        {isCooking ? "呼出中にする" : "受け渡し完了"}
-      </button>
+      {onAdvance && (
+        <button
+          type="button"
+          onClick={() => onAdvance(order)}
+          className="rounded-xl bg-emerald-600 text-white font-bold px-5 py-3 active:opacity-80"
+        >
+          呼出中にする
+        </button>
+      )}
     </div>
   );
 }

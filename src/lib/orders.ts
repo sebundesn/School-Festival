@@ -2,8 +2,6 @@ import { Order, OrderItem, OrderStatus } from "@/app/type/Order";
 import { MENU_ITEMS } from "@/lib/menu";
 
 // ローカル実装: ブラウザの localStorage に保存する（バックエンド不要）。
-// 同一ブラウザ内なら /register /kitchen / /admin のタブ間で `storage` イベント経由で同期される。
-// 別端末間の共有が必要になったら、このファイルの中身だけを API 呼び出しに差し替える（infra/ 参照）。
 
 const STORAGE_KEY = "yakitori:state:v1";
 const LOCK_NAME = "yakitori-state-lock";
@@ -47,7 +45,7 @@ function writeState(state: State) {
   notify();
 }
 
-/** 読み取り→更新→書き込みを排他的に行う（複数タブからの同時操作で番号が被らないように）。 */
+/** 読み取り→更新→書き込みを排他的に行う */
 async function withLock<T>(fn: () => T): Promise<T> {
   if (typeof navigator !== "undefined" && navigator.locks) {
     return navigator.locks.request(LOCK_NAME, async () => fn());

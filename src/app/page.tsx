@@ -5,7 +5,7 @@ import { Order } from "./type/Order";
 import { subscribeActiveOrders } from "@/lib/orders";
 
 function formatOrderNumber(orderNumber: number) {
-  return `#${String(orderNumber).padStart(3, "0")}`;
+  return `${String(orderNumber).padStart(3, "0")}`;
 }
 
 export default function MainPage() {
@@ -21,20 +21,20 @@ export default function MainPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-white p-8 flex flex-col gap-10">
+    <main className="min-h-screen bg-white text-neutral-900 p-8 grid grid-cols-2 gap-8">
       <section className="flex-1 flex flex-col gap-6">
-        <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3 text-orange-300">
+        <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3 text-orange-600">
           <span>🔥</span> 調理中 (COOKING)
         </h2>
 
         <div className="flex flex-wrap gap-4">
           {cookingOrders.length === 0 && (
-            <p className="text-neutral-500 text-xl">現在調理中の注文はありません</p>
+            <p className="text-neutral-400 text-xl">現在調理中の注文はありません</p>
           )}
           {cookingOrders.map((order) => (
             <div
               key={order.id}
-              className="min-w-32 rounded-2xl bg-neutral-800 border border-neutral-700 px-6 py-5 text-center"
+              className="min-w-32 rounded-2xl bg-neutral-100 border border-neutral-300 px-6 py-5 text-center"
             >
               <p className="text-4xl md:text-5xl font-mono font-bold tabular-nums">
                 {formatOrderNumber(order.orderNumber)}
@@ -45,20 +45,20 @@ export default function MainPage() {
       </section>
 
       <section className="flex-1 flex flex-col gap-6">
-        <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3 text-emerald-300">
+        <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3 text-emerald-700">
           <span>🔔</span> お渡し可能 (READY)
         </h2>
 
         <div className="flex flex-wrap gap-4">
           {readyOrders.length === 0 && (
-            <p className="text-neutral-500 text-xl">呼び出し中の注文はありません</p>
+            <p className="text-neutral-400 text-xl">呼び出し中の注文はありません</p>
           )}
           {readyOrders.map((order) => (
             <div
               key={order.id}
-              className="min-w-32 rounded-2xl bg-emerald-900/60 border-2 border-emerald-400 px-6 py-5 text-center animate-pulse"
+              className="min-w-32 rounded-2xl bg-emerald-100 border-2 border-emerald-500 px-6 py-5 text-center animate-pulse"
             >
-              <p className="text-4xl md:text-5xl font-mono font-bold tabular-nums text-emerald-200">
+              <p className="text-4xl md:text-5xl font-mono font-bold tabular-nums text-emerald-800">
                 {formatOrderNumber(order.orderNumber)}
               </p>
             </div>

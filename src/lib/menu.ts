@@ -6,6 +6,6 @@ export interface MenuItem {
 
 //後で変更
 export const MENU_ITEMS: MenuItem[] = [
-  { id: "tare", name: "タレ", pricePerOne: 150 },
-  { id: "shio", name: "塩", pricePerOne: 150 },
+  { id: "tare", name: "タレ", pricePerOne: 100 },
+  { id: "shio", name: "塩", pricePerOne: 100 },
 ];
