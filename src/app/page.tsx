@@ -23,7 +23,7 @@ export default function MainPage() {
   return (
     <main className="min-h-screen bg-white text-neutral-900 p-8 grid grid-cols-2 gap-8">
       <section className="flex-1 flex flex-col gap-6">
-        <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3 text-orange-600">
+        <h2 className="mt-5 text-3xl md:text-4xl font-bold flex items-center gap-3 text-orange-600">
           <span>🔥</span> 調理中 (COOKING)
         </h2>
 
@@ -44,8 +44,8 @@ export default function MainPage() {
         </div>
       </section>
 
-      <section className="flex-1 flex flex-col gap-6">
-        <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3 text-emerald-700">
+      <section className="flex-1 flex flex-col gap-6 border-l-4 border-dashed border-neutral-300 pl-8">
+        <h2 className="mt-5 text-3xl md:text-4xl font-bold flex items-center gap-3 text-emerald-700">
           <span>🔔</span> お渡し可能 (READY)
         </h2>
 

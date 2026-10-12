@@ -55,35 +55,43 @@ export default function KitchenPage() {
   const readyOrders = orders.filter((order) => order.status === "ready");
 
   return (
-    <main className="min-h-screen bg-neutral-100 p-6 flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">厨房・ステータス管理</h1>
+    <main className="h-screen overflow-hidden bg-neutral-100 p-6 flex flex-col gap-6">
+      <h1 className="text-5xl font-bold text-center">厨房</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <section className="md:col-span-3 flex flex-col gap-3">
-          <h2 className="text-xl font-semibold text-orange-600">🔥 調理中</h2>
-          {cookingOrders.length === 0 && (
-            <p className="text-neutral-400">調理中の注文はありません</p>
-          )}
-          {cookingOrders.map((order) => (
-            <OrderCard key={order.id} order={order} onAdvance={advanceStatus} />
-          ))}
+      <div className="grid grid-cols-1 md:grid-cols-[repeat(13,minmax(0,1fr))] gap-6 flex-1 min-h-0">
+        <section className="md:col-span-9 flex flex-col gap-3 min-h-0 rounded-2xl bg-orange-50 border-2 border-orange-200 p-4">
+          <h2 className="text-4xl font-semibold text-orange-600">🔥 調理中</h2>
+          <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-3 content-start">
+            {cookingOrders.length === 0 && (
+              <div className="col-span-full flex items-center justify-center min-h-[40vh]">
+                <p className="font-bold text-5xl text-orange-600 text-center">No 注文</p>
+              </div>
+            )}
+            {cookingOrders.map((order) => (
+              <OrderCard key={order.id} order={order} onAdvance={advanceStatus} />
+            ))}
+          </div>
         </section>
 
-        <section className="md:col-span-2 flex flex-col gap-3">
-          <h2 className="text-xl font-semibold text-emerald-600">🔔 呼出中</h2>
-          {readyOrders.length === 0 && (
-            <p className="text-neutral-400">呼出中の注文はありません</p>
-          )}
-          {readyOrders.map((order) => (
-            <OrderCard key={order.id} order={order} />
-          ))}
+        <section className="md:col-span-4 flex flex-col gap-3 min-h-0 rounded-2xl bg-emerald-50 border-2 border-emerald-200 p-4">
+          <h2 className="text-4xl font-semibold text-emerald-600">🔔 呼出中</h2>
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3">
+            {readyOrders.length === 0 && (
+              <div className="flex-1 flex items-center justify-center">
+                <p className="font-bold text-5xl text-emerald-600 text-center">No 注文</p>
+              </div>
+            )}
+            {readyOrders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))}
+          </div>
         </section>
       </div>
 
       {pendingUndo && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-xl bg-neutral-900 text-white px-5 py-3 flex items-center gap-4 shadow-lg">
           <span>
-            #{String(pendingUndo.orderNumber).padStart(3, "0")} を更新しました
+            {String(pendingUndo.orderNumber).padStart(3, "0")} を更新しました
           </span>
           <button
             type="button"
@@ -106,28 +114,28 @@ function OrderCard({
   onAdvance?: (order: Order) => void;
 }) {
   return (
-    <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4 flex items-center justify-between gap-4">
-      <div>
-        <p className="font-mono font-bold text-2xl tabular-nums">
-          #{String(order.orderNumber).padStart(3, "0")}
-        </p>
-        <ul className="text-neutral-600">
+    <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4 flex flex-col gap-2">
+      <p className="font-mono font-bold text-2xl tabular-nums">
+        {String(order.orderNumber).padStart(3, "0")}
+      </p>
+      <div className="flex items-center justify-between gap-4">
+        <ul className="flex-1 text-center text-xl font-bold text-neutral-900">
           {order.items.map((item) => (
             <li key={item.menuId}>
               {item.name} × {item.quantity}
             </li>
           ))}
         </ul>
+        {onAdvance && (
+          <button
+            type="button"
+            onClick={() => onAdvance(order)}
+            className="rounded-xl bg-emerald-600 text-white font-bold px-5 py-3 active:opacity-80"
+          >
+            呼出中にする
+          </button>
+        )}
       </div>
-      {onAdvance && (
-        <button
-          type="button"
-          onClick={() => onAdvance(order)}
-          className="rounded-xl bg-emerald-600 text-white font-bold px-5 py-3 active:opacity-80"
-        >
-          呼出中にする
-        </button>
-      )}
     </div>
   );
 }
