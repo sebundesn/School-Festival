@@ -375,7 +375,12 @@ data "aws_iam_policy_document" "github_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:ref:refs/heads/main"]
+      # GitHub はオーナー・リポジトリの ID 付きの形式（owner@id/repo@id）で送ってくる。
+      # ID で照合すれば、同じ名前で作り直されたリポジトリからは入れない。
+      values = [
+        "repo:${var.github_repo}:ref:refs/heads/main",
+        "repo:${var.github_repo_with_ids}:ref:refs/heads/main",
+      ]
     }
   }
 }

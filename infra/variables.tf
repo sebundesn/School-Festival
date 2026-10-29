@@ -28,3 +28,9 @@ variable "github_repo" {
   type        = string
   default     = "sebundesn/School-Festival"
 }
+
+variable "github_repo_with_ids" {
+  description = "github_repo の ID 付き表記（owner@オーナーID/name@リポジトリID）。GitHub OIDC トークンの sub はこの形式で届く"
+  type        = string
+  default     = "sebundesn@192684360/School-Festival@1368442922"
+}
