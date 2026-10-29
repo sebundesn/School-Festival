@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Order } from "../type/Order";
-import { subscribeAllOrders, resetCounter, cancelOrder } from "@/lib/orders";
+import { subscribeAllOrders, resetCounter, setOrderStatus } from "@/lib/orders";
 import { MENU_ITEMS } from "@/lib/menu";
 
 function formatNumber(orderNumber: number) {
@@ -39,9 +39,9 @@ export default function AdminPage() {
     return { totalAmount, countByMenu };
   }, [completed]);
 
-  async function handleCancel(order: Order) {
-    if (!window.confirm(`${formatNumber(order.orderNumber)} の注文を取り消します。よろしいですか？`)) return;
-    await cancelOrder(order.id);
+  // 受け渡しを押し間違えたときに呼出中へ戻す（履歴・売上からも外れる）
+  async function handleBackToReady(order: Order) {
+    await setOrderStatus(order.id, "ready");
   }
 
   async function handleResetCounter() {
@@ -110,10 +110,10 @@ export default function AdminPage() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => handleCancel(order)}
-                  className="shrink-0 rounded-lg bg-red-100 text-red-700 font-bold text-sm sm:text-base px-2.5 py-1 sm:px-4 sm:py-2 active:bg-red-200"
+                  onClick={() => handleBackToReady(order)}
+                  className="shrink-0 whitespace-nowrap rounded-lg bg-emerald-100 text-emerald-700 font-bold text-sm sm:text-base px-2.5 py-1 sm:px-4 sm:py-2 active:bg-emerald-200"
                 >
-                  取消
+                  呼出中に戻す
                 </button>
               </li>
             ))}
