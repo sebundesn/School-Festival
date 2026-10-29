@@ -22,7 +22,7 @@ export const handler = async (event) => {
     }
 
     if (method === "POST" && path === "/orders") {
-      const body = JSON.parse(event.body ?? "{}");
+      const body = parseBody(event);
       const items = [];
       const half = body.isHalfPrice === true;
       for (const it of body.items ?? []) {
@@ -68,7 +68,7 @@ export const handler = async (event) => {
     // ステータス変更。会計済み(completed)/取消への遷移は「現在の状態」を条件にして二重処理を防ぎ、
     // 集計値は遷移に成功した1回だけ加算/減算する。
     if (method === "PATCH" && id) {
-      const { status } = JSON.parse(event.body ?? "{}");
+      const { status } = parseBody(event);
       if (!STATUSES.includes(status)) return res(400, { error: "bad status" });
       const cur = await db.send(new GetCommand({ TableName: ORDERS_TABLE, Key: { orderId: id } }));
       if (!cur.Item) return res(404, { error: "not found" });
@@ -116,6 +116,16 @@ export const handler = async (event) => {
     return res(500, { error: "internal" });
   }
 };
+
+// content-type が JSON 以外だと API Gateway は本文を base64 で渡してくる
+function parseBody(event) {
+  const raw = event.isBase64Encoded ? Buffer.from(event.body ?? "", "base64").toString("utf8") : event.body;
+  try {
+    return JSON.parse(raw || "{}");
+  } catch {
+    return {};
+  }
+}
 
 // Scan/Query は 1 回 1MB までなので、続きがあれば最後まで読む。
 async function readAll(makeCommand) {

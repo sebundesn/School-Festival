@@ -10,3 +10,4 @@ infra/.terraform
 infra/.build
 infra/*.tfstate*
 infra/terraform.tfvars
+infra/tfplan
