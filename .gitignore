@@ -7,4 +7,11 @@ package-lock.json
 package.json
 postcss.config.mjs
 tsconfig.json
-tsconfig.tsbuildinfo
+tsconfig.tsbuildinfoout
+.env*.local
+
+# Terraform（tfvars にはトークン、state には各種値が平文で入る）
+infra/.terraform
+infra/.build
+infra/*.tfstate*
+infra/terraform.tfvars

@@ -37,6 +37,7 @@
 | POST | `/orders` | `{"items":[{"name":"もも","qty":2}], "paid": false}` → 作成した注文 |
 | GET | `/orders?status=paid` | そのステータスの注文(古い順) |
 | PATCH | `/orders/{orderId}` | `{"status":"ready"}` |
+| POST | `/counter/reset` | 整理券番号を 0 に戻す(注文・集計は残す) |
 | GET | `/stats` | `{"orders","sales","skewers","byItem"}`(会計済みのみ集計) |
 | GET | `/export.csv` | 1品目1行のCSV(注文ID・整理券番号・品物・本数・単価・小計・ステータス・注文時刻・会計時刻、JST) |
 
@@ -55,6 +56,19 @@ terraform apply
 
 +予算アラート
 ```
+
+### 画面(フロント)のデプロイ
+
+```bash
+# terraform output の http_api_url / ws_url を .env.local に書く(.env.example 参照)
+npm run build                                   # out/ に静的ファイルが出る
+aws s3 sync out/ s3://$(terraform -chdir=infra output -raw site_bucket) --delete
+aws cloudfront create-invalidation --distribution-id $(terraform -chdir=infra output -raw distribution_id) --paths "/*"
+```
+
+- `.env.local` が無いとローカル版(localStorage・1台のみ)でビルドされるので注意。
+- 各端末で最初に開いたときにスタッフ用トークン(`staff_token`)を聞かれます。
+  `https://<site_url>/kitchen?token=<staff_token>` のように付けて開けば入力不要(QRコード配布用)。
 
 CSV は `fetch` で取得して Blob にしてダウンロードさせてください(トークンをヘッダーで送るため、`<a href>` 直リンクは使えません)。
 

@@ -49,14 +49,20 @@ export const handler = async (event) => {
 
     if (method === "GET" && path === "/orders") {
       const status = event.queryStringParameters?.status;
-      const out = status
-        ? await db.send(new QueryCommand({
+      const items = status
+        ? await readAll((k) => new QueryCommand({
             TableName: ORDERS_TABLE, IndexName: "by-status",
             KeyConditionExpression: "#s = :s", ExpressionAttributeNames: { "#s": "status" },
-            ExpressionAttributeValues: { ":s": status },
+            ExpressionAttributeValues: { ":s": status }, ExclusiveStartKey: k,
           }))
-        : await db.send(new ScanCommand({ TableName: ORDERS_TABLE }));
-      return res(200, (out.Items ?? []).sort((a, b) => a.orderNumber - b.orderNumber));
+        : await readAll((k) => new ScanCommand({ TableName: ORDERS_TABLE, ExclusiveStartKey: k }));
+      return res(200, items.sort((a, b) => a.orderNumber - b.orderNumber));
+    }
+
+    // 整理券番号を 0 に戻す（注文データ・集計は消さない）
+    if (method === "POST" && path === "/counter/reset") {
+      await db.send(new PutCommand({ TableName: META_TABLE, Item: { pk: "counter", n: 0 } }));
+      return res(200, { ok: true });
     }
 
     // ステータス変更。会計済み(completed)/取消への遷移は「現在の状態」を条件にして二重処理を防ぎ、
@@ -95,7 +101,7 @@ export const handler = async (event) => {
     }
 
     if (method === "GET" && path === "/export.csv") {
-      const items = (await db.send(new ScanCommand({ TableName: ORDERS_TABLE }))).Items ?? [];
+      const items = await readAll((k) => new ScanCommand({ TableName: ORDERS_TABLE, ExclusiveStartKey: k }));
       const jst = (iso) => new Date(iso).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", hour12: false });
       const rows = [["注文ID", "整理券番号", "品物", "本数", "単価", "小計", "ステータス", "注文時刻"]];
       for (const o of items.sort((a, b) => a.orderNumber - b.orderNumber))
@@ -110,6 +116,18 @@ export const handler = async (event) => {
     return res(500, { error: "internal" });
   }
 };
+
+// Scan/Query は 1 回 1MB までなので、続きがあれば最後まで読む。
+async function readAll(makeCommand) {
+  const items = [];
+  let key;
+  do {
+    const out = await db.send(makeCommand(key));
+    items.push(...(out.Items ?? []));
+    key = out.LastEvaluatedKey;
+  } while (key);
+  return items;
+}
 
 // 会計済みになる(+1)/会計済みでなくなる(-1)ときの集計加減算。品目別は平坦なキー item_<menuId> で持つ。
 function statsUpdate(o, sign) {

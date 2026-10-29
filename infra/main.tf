@@ -278,6 +278,20 @@ resource "aws_cloudfront_origin_access_control" "site" {
   signing_protocol                  = "sigv4"
 }
 
+# /register → /register.html (Next.js static export の出力名に合わせる)
+resource "aws_cloudfront_function" "rewrite" {
+  name    = "${local.name}-rewrite"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var r = event.request;
+      if (r.uri !== "/" && r.uri.indexOf(".") === -1) r.uri = r.uri.replace(/\/$/, "") + ".html";
+      return r;
+    }
+  EOT
+}
+
 resource "aws_cloudfront_distribution" "site" {
   enabled             = true
   default_root_object = "index.html"
@@ -294,6 +308,11 @@ resource "aws_cloudfront_distribution" "site" {
     allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]
     cache_policy_id        = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.rewrite.arn
+    }
   }
 
   # /register などの直アクセス用 (Next.js static export: register.html)
