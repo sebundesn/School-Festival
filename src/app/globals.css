@@ -4,6 +4,17 @@ body {
   background: #ffffff;
   color: #171717;
   font-family: Arial, Helvetica, sans-serif;
+  /* 長押しで文字選択・コピー・リンクのプレビューが出ないようにする（レジ操作中の誤操作防止） */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 @keyframes notice-fade {

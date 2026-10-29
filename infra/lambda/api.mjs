@@ -11,8 +11,11 @@ const res = (code, body, headers = {}) => ({
 });
 
 export const handler = async (event) => {
-  if ((event.headers?.["x-staff-token"] ?? "") !== STAFF_TOKEN) return res(401, { error: "unauthorized" });
   const method = event.requestContext.http.method;
+  // $default ルートだと CORS プリフライトもここに届く。ブラウザはトークンを付けずに送るので、認証より先に 2xx を返す
+  // （CORS ヘッダーは API Gateway が付ける）
+  if (method === "OPTIONS") return { statusCode: 204 };
+  if ((event.headers?.["x-staff-token"] ?? "") !== STAFF_TOKEN) return res(401, { error: "unauthorized" });
   const path = event.rawPath;
   const id = path.match(/^\/orders\/([^/]+)$/)?.[1];
 
