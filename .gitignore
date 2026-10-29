@@ -1,13 +1,8 @@
 .next
 node_modules
-eslint.config.mjs
+out
 next-env.d.ts
-next.config.ts
-package-lock.json
-package.json
-postcss.config.mjs
-tsconfig.json
-tsconfig.tsbuildinfoout
+tsconfig.tsbuildinfo
 .env*.local
 
 # Terraform（tfvars にはトークン、state には各種値が平文で入る）
