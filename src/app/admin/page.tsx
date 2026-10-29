@@ -9,6 +9,9 @@ function formatNumber(orderNumber: number) {
   return String(orderNumber).padStart(3, "0");
 }
 
+// 全削除の押し間違い防止用。画面のコードに入るので秘密ではない（API はスタッフ用トークンで守っている）
+const CLEAR_PASSWORD = "0731";
+
 /** 売上と品目別セット数を、メモしやすい文面にする。 */
 function formatSummary(sales: number, countOf: (menuId: string) => number) {
   return [
@@ -59,24 +62,18 @@ export default function AdminPage() {
     await resetCounter();
   }
 
-  // 片付け用。消す前と消した後の両方で売上・セット数を出し、記録してもらう
+  // 片付け用。パスワードを確かめてから消し、売上・セット数をアラートで出して記録してもらう
   async function handleClearAll() {
-    const active = orders.filter((o) => o.status === "cooking" || o.status === "ready").length;
-    const message = [
-      "全注文を削除します（元に戻せません）。整理券番号も #001 に戻ります。",
-      active > 0 ? `\n⚠ 調理中・呼出中の注文が ${active} 件あります。これも消えます。` : "",
-      "\n削除前に以下を記録してください:",
-      formatSummary(summary.totalAmount, (id) => summary.countByMenu.get(id) ?? 0),
-      "\n削除してよろしいですか？",
-    ].join("\n");
-    if (!window.confirm(message)) return;
+    const input = window.prompt("全注文を削除します（元に戻せません）。\nパスワードを入力してください");
+    if (input === null) return;
+    if (input.trim() !== CLEAR_PASSWORD) {
+      window.alert("パスワードが違います");
+      return;
+    }
 
     const result = await clearAllOrders();
     if (!result) return;
-    window.alert(
-      `${result.deleted} 件の注文を削除しました。\n\n` +
-        formatSummary(result.sales, (id) => result.byItem[id] ?? 0)
-    );
+    window.alert(formatSummary(result.sales, (id) => result.byItem[id] ?? 0));
   }
 
   return (
@@ -123,7 +120,7 @@ export default function AdminPage() {
         <div className="min-w-0">
           <p className="text-sm sm:text-base font-semibold">全注文の削除</p>
           <p className="text-neutral-500 text-xs sm:text-sm">
-            売上・セット数を表示してから、全端末の注文と集計を消します。片付け用です。
+            パスワードを入れると全端末の注文と集計を消し、売上・セット数を表示します。片付け用です。
           </p>
         </div>
         <button
