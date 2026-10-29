@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, QueryCommand, ScanCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { BatchWriteCommand, DeleteCommand, GetCommand, PutCommand, QueryCommand, ScanCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { db, MENU } from "./common.mjs";
 
 const { ORDERS_TABLE, META_TABLE, STAFF_TOKEN } = process.env;
@@ -66,6 +66,28 @@ export const handler = async (event) => {
     if (method === "POST" && path === "/counter/reset") {
       await db.send(new PutCommand({ TableName: META_TABLE, Item: { pk: "counter", n: 0 } }));
       return res(200, { ok: true });
+    }
+
+    // 全注文の削除（片付け用）。消す前に受け渡し完了分の売上・品目別本数を集計して返す。
+    // 集計値と整理券番号も 0 に戻す。他端末には DynamoDB Streams 経由で削除が届く。
+    if (method === "POST" && path === "/orders/clear") {
+      const all = await readAll((k) => new ScanCommand({ TableName: ORDERS_TABLE, ExclusiveStartKey: k }));
+      const summary = { deleted: all.length, sales: 0, byItem: {} };
+      for (const o of all) {
+        if (o.status !== "completed") continue;
+        summary.sales += o.totalAmount;
+        for (const i of o.items) summary.byItem[i.menuId] = (summary.byItem[i.menuId] ?? 0) + i.quantity;
+      }
+      for (let i = 0; i < all.length; i += 25) {
+        let requests = all.slice(i, i + 25).map((o) => ({ DeleteRequest: { Key: { orderId: o.orderId } } }));
+        while (requests.length) {
+          const out = await db.send(new BatchWriteCommand({ RequestItems: { [ORDERS_TABLE]: requests } }));
+          requests = out.UnprocessedItems?.[ORDERS_TABLE] ?? [];
+        }
+      }
+      await db.send(new DeleteCommand({ TableName: META_TABLE, Key: { pk: "stats" } }));
+      await db.send(new PutCommand({ TableName: META_TABLE, Item: { pk: "counter", n: 0 } }));
+      return res(200, summary);
     }
 
     // ステータス変更。会計済み(completed)/取消への遷移は「現在の状態」を条件にして二重処理を防ぎ、

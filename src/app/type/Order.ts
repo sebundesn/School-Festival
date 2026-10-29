@@ -15,3 +15,11 @@ export interface Order {
   status: OrderStatus;
   createdAt: Date | null;
 }
+
+/** 全注文削除の直前に集計した値（受け渡し完了分のみ）。 */
+export interface ClearSummary {
+  deleted: number;
+  sales: number;
+  /** menuId → 本数 */
+  byItem: Record<string, number>;
+}

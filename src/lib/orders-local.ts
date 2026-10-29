@@ -1,4 +1,4 @@
-import { Order, OrderItem, OrderStatus } from "@/app/type/Order";
+import { ClearSummary, Order, OrderItem, OrderStatus } from "@/app/type/Order";
 import { MENU_ITEMS, halfPrice } from "@/lib/menu";
 
 // ローカル実装: ブラウザの localStorage に保存する（バックエンド不要）。
@@ -155,4 +155,19 @@ export async function cancelOrder(orderId: string) {
 /** 整理券番号を 0 に戻す（注文データは消さない）。 */
 export async function resetCounter() {
   await withLock(() => writeState({ ...readState(), counter: 0 }));
+}
+
+/** 全注文を削除し、削除前の集計（受け渡し完了分）を返す。整理券番号も 0 に戻す。 */
+export async function clearAllOrders(): Promise<ClearSummary | null> {
+  return withLock(() => {
+    const state = readState();
+    const summary: ClearSummary = { deleted: state.orders.length, sales: 0, byItem: {} };
+    for (const o of state.orders) {
+      if (o.status !== "completed") continue;
+      summary.sales += o.totalAmount;
+      for (const i of o.items) summary.byItem[i.menuId] = (summary.byItem[i.menuId] ?? 0) + i.quantity;
+    }
+    writeState({ ...state, orders: [], counter: 0 });
+    return summary;
+  });
 }

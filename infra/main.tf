@@ -100,7 +100,7 @@ resource "aws_iam_role_policy_attachment" "logs" {
 
 data "aws_iam_policy_document" "lambda" {
   statement {
-    actions = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:TransactWriteItems"]
+    actions = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:TransactWriteItems", "dynamodb:BatchWriteItem"]
     resources = [
       aws_dynamodb_table.orders.arn,
       "${aws_dynamodb_table.orders.arn}/index/*",

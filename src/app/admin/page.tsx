@@ -2,11 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Order } from "../type/Order";
-import { subscribeAllOrders, resetCounter, setOrderStatus } from "@/lib/orders";
+import { subscribeAllOrders, resetCounter, setOrderStatus, clearAllOrders } from "@/lib/orders";
 import { MENU_ITEMS } from "@/lib/menu";
 
 function formatNumber(orderNumber: number) {
   return String(orderNumber).padStart(3, "0");
+}
+
+/** 売上と品目別セット数を、メモしやすい文面にする。 */
+function formatSummary(sales: number, countOf: (menuId: string) => number) {
+  return [
+    `売上: ¥${sales.toLocaleString()}`,
+    ...MENU_ITEMS.map((item) => `${item.name}: ${countOf(item.id)}セット`),
+  ].join("\n");
 }
 
 export default function AdminPage() {
@@ -51,6 +59,26 @@ export default function AdminPage() {
     await resetCounter();
   }
 
+  // 片付け用。消す前と消した後の両方で売上・セット数を出し、記録してもらう
+  async function handleClearAll() {
+    const active = orders.filter((o) => o.status === "cooking" || o.status === "ready").length;
+    const message = [
+      "全注文を削除します（元に戻せません）。整理券番号も #001 に戻ります。",
+      active > 0 ? `\n⚠ 調理中・呼出中の注文が ${active} 件あります。これも消えます。` : "",
+      "\n削除前に以下を記録してください:",
+      formatSummary(summary.totalAmount, (id) => summary.countByMenu.get(id) ?? 0),
+      "\n削除してよろしいですか？",
+    ].join("\n");
+    if (!window.confirm(message)) return;
+
+    const result = await clearAllOrders();
+    if (!result) return;
+    window.alert(
+      `${result.deleted} 件の注文を削除しました。\n\n` +
+        formatSummary(result.sales, (id) => result.byItem[id] ?? 0)
+    );
+  }
+
   return (
     <main className="min-h-[calc(100dvh-3rem)] bg-neutral-100 p-3 sm:p-6 flex flex-col gap-3 sm:gap-6 w-full max-w-3xl mx-auto">
       {/* スマホでも左右に並べる */}
@@ -88,6 +116,22 @@ export default function AdminPage() {
           className="shrink-0 rounded-xl bg-red-600 text-white font-bold text-sm sm:text-base px-3 py-2 sm:px-5 sm:py-3 active:bg-red-700"
         >
           リセット
+        </button>
+      </div>
+
+      <div className="rounded-xl bg-white border border-neutral-300 px-3 py-2 sm:px-5 sm:py-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm sm:text-base font-semibold">全注文の削除</p>
+          <p className="text-neutral-500 text-xs sm:text-sm">
+            売上・セット数を表示してから、全端末の注文と集計を消します。片付け用です。
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleClearAll}
+          className="shrink-0 rounded-xl bg-red-600 text-white font-bold text-sm sm:text-base px-3 py-2 sm:px-5 sm:py-3 active:bg-red-700"
+        >
+          全削除
         </button>
       </div>
 

@@ -1,4 +1,4 @@
-import { Order, OrderItem, OrderStatus } from "@/app/type/Order";
+import { ClearSummary, Order, OrderItem, OrderStatus } from "@/app/type/Order";
 
 // AWS 実装: 書き込み・取得は HTTP API、他端末の変更は WebSocket で受け取る（infra/ を参照）。
 
@@ -116,6 +116,7 @@ function connect() {
     try {
       const msg = JSON.parse(e.data);
       if (msg.type === "order" && msg.order?.orderId) upsert(msg.order);
+      if (msg.type === "remove" && typeof msg.orderId === "string" && orders.delete(msg.orderId)) notify();
     } catch {
       // 不正なメッセージは無視
     }
@@ -218,5 +219,20 @@ export async function resetCounter() {
     if (!res.ok) throw new Error(`resetCounter failed: ${res.status}`);
   } catch {
     window.alert(NETWORK_ERROR);
+  }
+}
+
+/** 全注文を削除し、削除前の集計を返す。失敗したら null（知らせるのはここ）。 */
+export async function clearAllOrders(): Promise<ClearSummary | null> {
+  try {
+    const res = await request("/orders/clear", { method: "POST" });
+    if (!res.ok) throw new Error(`clearAllOrders failed: ${res.status}`);
+    const summary = (await res.json()) as ClearSummary;
+    orders.clear();
+    notify();
+    return summary;
+  } catch {
+    window.alert(NETWORK_ERROR);
+    return null;
   }
 }

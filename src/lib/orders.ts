@@ -11,3 +11,4 @@ export const subscribeAllOrders = impl.subscribeAllOrders;
 export const setOrderStatus = impl.setOrderStatus;
 export const cancelOrder = impl.cancelOrder;
 export const resetCounter = impl.resetCounter;
+export const clearAllOrders = impl.clearAllOrders;
