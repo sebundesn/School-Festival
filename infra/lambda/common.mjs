@@ -7,6 +7,6 @@ export const db = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
 
 // 価格はサーバー側が正。src/lib/menu.ts と揃えること。
 export const MENU = {
-  tare: { name: "タレ", price: 150 },
-  shio: { name: "塩", price: 150 },
+  tare: { name: "タレ", price: 300 },
+  shio: { name: "塩", price: 300 },
 };

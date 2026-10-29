@@ -1,5 +1,5 @@
 import { Order, OrderItem, OrderStatus } from "@/app/type/Order";
-import { MENU_ITEMS } from "@/lib/menu";
+import { MENU_ITEMS, halfPrice } from "@/lib/menu";
 
 // ローカル実装: ブラウザの localStorage に保存する（バックエンド不要）。
 
@@ -77,8 +77,9 @@ function sortedOrders(select: (o: Order) => boolean): Order[] {
 /**
  * 注文を登録して整理券番号を返す。
  * 品名・単価・合計はクライアントの値を信用せず、MENU_ITEMS から再計算する。
+ * isHalfPrice の場合は全品を半額の単価で記録する。
  */
-export async function placeOrder(items: OrderItem[]): Promise<number> {
+export async function placeOrder(items: OrderItem[], isHalfPrice = false): Promise<number> {
   const normalized: OrderItem[] = [];
   for (const item of items) {
     const menu = MENU_ITEMS.find((m) => m.id === item.menuId);
@@ -88,7 +89,7 @@ export async function placeOrder(items: OrderItem[]): Promise<number> {
       menuId: menu.id,
       name: menu.name,
       quantity,
-      pricePerOne: menu.pricePerOne,
+      pricePerOne: isHalfPrice ? halfPrice(menu.pricePerOne) : menu.pricePerOne,
     });
   }
   if (normalized.length === 0) throw new Error("empty order");
@@ -154,25 +155,4 @@ export async function cancelOrder(orderId: string) {
 /** 整理券番号を 0 に戻す（注文データは消さない）。 */
 export async function resetCounter() {
   await withLock(() => writeState({ ...readState(), counter: 0 }));
-}
-
-/** 全注文を 1 品目 1 行の CSV にする（取消済みも含む）。 */
-export function buildCsv(orders: Order[]): string {
-  const header = ["注文ID", "整理券番号", "品物", "本数", "単価", "小計", "ステータス", "注文時刻"];
-  const fmt = (d: Date | null) =>
-    d ? d.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", hour12: false }) : "";
-  const rows = orders.flatMap((o) =>
-    o.items.map((i) => [
-      o.id,
-      o.orderNumber,
-      i.name,
-      i.quantity,
-      i.pricePerOne,
-      i.pricePerOne * i.quantity,
-      o.status,
-      fmt(o.createdAt),
-    ])
-  );
-  const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-  return "﻿" + [header, ...rows].map((r) => r.map(esc).join(",")).join("\r\n");
 }

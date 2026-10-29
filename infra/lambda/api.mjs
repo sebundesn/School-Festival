@@ -24,10 +24,11 @@ export const handler = async (event) => {
     if (method === "POST" && path === "/orders") {
       const body = JSON.parse(event.body ?? "{}");
       const items = [];
+      const half = body.isHalfPrice === true;
       for (const it of body.items ?? []) {
         const m = MENU[it.menuId];
         const qty = Math.floor(Number(it.qty ?? it.quantity));
-        if (m && qty > 0) items.push({ menuId: it.menuId, name: m.name, quantity: qty, pricePerOne: m.price });
+        if (m && qty > 0) items.push({ menuId: it.menuId, name: m.name, quantity: qty, pricePerOne: half ? Math.floor(m.price / 2) : m.price });
       }
       if (!items.length) return res(400, { error: "empty order" });
       const totalAmount = items.reduce((s, i) => s + i.pricePerOne * i.quantity, 0);

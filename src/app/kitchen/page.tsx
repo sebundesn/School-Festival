@@ -1,141 +1,139 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Order, OrderStatus } from "../type/Order";
+import { useEffect, useState } from "react";
+import { Order } from "../type/Order";
 import { subscribeActiveOrders, setOrderStatus } from "@/lib/orders";
-
-const UNDO_WINDOW_MS = 5000;
-
-interface PendingUndo {
-  orderId: string;
-  orderNumber: number;
-  previousStatus: OrderStatus;
-}
 
 export default function KitchenPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
-  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeActiveOrders(setOrders);
     return unsubscribe;
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (undoTimer.current) clearTimeout(undoTimer.current);
-    };
-  }, []);
-
-  function armUndo(order: Order) {
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    setPendingUndo({
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      previousStatus: order.status,
-    });
-    undoTimer.current = setTimeout(() => setPendingUndo(null), UNDO_WINDOW_MS);
+  async function toReady(order: Order) {
+    await setOrderStatus(order.id, "ready");
   }
 
-  async function advanceStatus(order: Order) {
-    const nextStatus: OrderStatus = order.status === "cooking" ? "ready" : "completed";
-    armUndo(order);
-    await setOrderStatus(order.id, nextStatus);
-  }
-
-  async function handleUndo() {
-    if (!pendingUndo) return;
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    await setOrderStatus(pendingUndo.orderId, pendingUndo.previousStatus);
-    setPendingUndo(null);
+  async function backToCooking(order: Order) {
+    await setOrderStatus(order.id, "cooking");
   }
 
   const cookingOrders = orders.filter((order) => order.status === "cooking");
   const readyOrders = orders.filter((order) => order.status === "ready");
 
   return (
-    <main className="h-screen overflow-hidden bg-neutral-100 p-6 flex flex-col gap-6">
-      <h1 className="text-5xl font-bold text-center">厨房</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-[repeat(13,minmax(0,1fr))] gap-6 flex-1 min-h-0">
-        <section className="md:col-span-9 flex flex-col gap-3 min-h-0 rounded-2xl bg-orange-50 border-2 border-orange-200 p-4">
-          <h2 className="text-4xl font-semibold text-orange-600">🔥 調理中</h2>
-          <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-3 content-start">
-            {cookingOrders.length === 0 && (
-              <div className="col-span-full flex items-center justify-center min-h-[40vh]">
-                <p className="font-bold text-5xl text-orange-600 text-center">No 注文</p>
-              </div>
-            )}
-            {cookingOrders.map((order) => (
-              <OrderCard key={order.id} order={order} onAdvance={advanceStatus} />
-            ))}
-          </div>
+    <main className="h-[calc(100dvh-3rem)] overflow-hidden bg-neutral-100 p-2 sm:p-4 lg:p-6 flex flex-col gap-2 sm:gap-3 lg:gap-6">
+      {/* スマホ・タブレットは上下分割、PC は左右分割。カードの大きさは画面幅ごとに固定（件数で動かない） */}
+      <div className="flex-1 min-h-0 grid grid-rows-[minmax(0,3fr)_minmax(0,2fr)] lg:grid-rows-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2 sm:gap-3 lg:gap-6">
+        <section className="flex flex-col gap-2 lg:gap-3 min-h-0 rounded-2xl bg-orange-50 border-2 border-orange-200 p-2 sm:p-3 lg:p-4">
+          <SectionHeading className="text-orange-600" label="🔥 調理中" count={cookingOrders.length} />
+          {cookingOrders.length === 0 ? (
+            <EmptyState className="text-orange-600" />
+          ) : (
+            <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 content-start">
+              {cookingOrders.map((order) => (
+                <OrderCard key={order.id} order={order} onAdvance={toReady} />
+              ))}
+            </div>
+          )}
         </section>
 
-        <section className="md:col-span-4 flex flex-col gap-3 min-h-0 rounded-2xl bg-emerald-50 border-2 border-emerald-200 p-4">
-          <h2 className="text-4xl font-semibold text-emerald-600">🔔 呼出中</h2>
-          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3">
-            {readyOrders.length === 0 && (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="font-bold text-5xl text-emerald-600 text-center">No 注文</p>
-              </div>
-            )}
-            {readyOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
-            ))}
-          </div>
+        <section className="flex flex-col gap-2 lg:gap-3 min-h-0 rounded-2xl bg-emerald-50 border-2 border-emerald-200 p-2 sm:p-3 lg:p-4">
+          <SectionHeading className="text-emerald-600" label="🔔 呼出中" count={readyOrders.length} />
+          {readyOrders.length === 0 ? (
+            <EmptyState className="text-emerald-600" />
+          ) : (
+            <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-3 content-start">
+              {readyOrders.map((order) => (
+                <ReadyTile key={order.id} order={order} onBack={backToCooking} />
+              ))}
+            </div>
+          )}
         </section>
       </div>
 
-      {pendingUndo && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-xl bg-neutral-900 text-white px-5 py-3 flex items-center gap-4 shadow-lg">
-          <span>
-            {String(pendingUndo.orderNumber).padStart(3, "0")} を更新しました
-          </span>
-          <button
-            type="button"
-            onClick={handleUndo}
-            className="rounded-lg bg-white text-neutral-900 font-bold px-4 py-2"
-          >
-            取り消す
-          </button>
-        </div>
-      )}
     </main>
   );
 }
 
-function OrderCard({
-  order,
-  onAdvance,
-}: {
-  order: Order;
-  onAdvance?: (order: Order) => void;
-}) {
+function formatNumber(orderNumber: number) {
+  return String(orderNumber).padStart(3, "0");
+}
+
+function SectionHeading({ label, count, className }: { label: string; count: number; className: string }) {
   return (
-    <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4 flex flex-col gap-2">
-      <p className="font-mono font-bold text-2xl tabular-nums">
-        {String(order.orderNumber).padStart(3, "0")}
-      </p>
-      <div className="flex items-center justify-between gap-4">
-        <ul className="flex-1 text-center text-xl font-bold text-neutral-900">
+    <h2 className={`flex items-baseline justify-between text-base sm:text-2xl lg:text-4xl font-semibold ${className}`}>
+      <span>{label}</span>
+      <span className="text-sm sm:text-lg lg:text-2xl tabular-nums">{count}件</span>
+    </h2>
+  );
+}
+
+function EmptyState({ className }: { className: string }) {
+  return (
+    <div className="flex-1 min-h-0 flex items-center justify-center">
+      <p className={`font-bold text-xl sm:text-4xl lg:text-5xl text-center ${className}`}>No 注文</p>
+    </div>
+  );
+}
+
+// カードの隅に添える小さい注文番号（厨房カード・呼出中タイルで同じサイズ）
+function OrderNumberBadge({ orderNumber }: { orderNumber: number }) {
+  return (
+    <span className="shrink-0 font-mono font-semibold tabular-nums leading-none text-neutral-500 text-xs sm:text-sm lg:text-base">
+      {formatNumber(orderNumber)}
+    </span>
+  );
+}
+
+// ボタンはカードの右下に固定（下余白 pb でボタンの高さ分を空けておく）
+// 文字サイズは スマホ / タブレット(sm) / PC(lg) の 3 段階で固定
+function OrderCard({ order, onAdvance }: { order: Order; onAdvance: (order: Order) => void }) {
+  return (
+    <div className="relative rounded-xl bg-white border border-neutral-300 p-2 sm:p-3 pb-9 sm:pb-11 lg:pb-12">
+      <div className="flex items-start gap-2">
+        <ul className="flex-1 text-center font-bold leading-tight text-neutral-900 text-sm sm:text-lg lg:text-xl">
           {order.items.map((item) => (
-            <li key={item.menuId}>
-              {item.name} × {item.quantity}
+            <li key={item.menuId} className="whitespace-nowrap">
+              {item.name}×{item.quantity}
             </li>
           ))}
         </ul>
-        {onAdvance && (
-          <button
-            type="button"
-            onClick={() => onAdvance(order)}
-            className="rounded-xl bg-emerald-600 text-white font-bold px-5 py-3 active:opacity-80"
-          >
-            呼出中にする
-          </button>
-        )}
+        <OrderNumberBadge orderNumber={order.orderNumber} />
       </div>
+      <button
+        type="button"
+        onClick={() => onAdvance(order)}
+        className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 rounded-lg bg-emerald-600 text-white font-bold whitespace-nowrap text-xs sm:text-sm lg:text-base px-2.5 py-1 sm:px-3 active:opacity-80"
+      >
+        呼出中に
+      </button>
+    </div>
+  );
+}
+
+function ReadyTile({ order, onBack }: { order: Order; onBack: (order: Order) => void }) {
+  return (
+    <div className="relative rounded-xl bg-white border-2 border-emerald-300 p-1.5 sm:p-2 pb-9 sm:pb-10 lg:pb-11">
+      <div className="flex items-start gap-1.5">
+        <ul className="flex-1 text-center font-semibold leading-tight text-neutral-600 text-xs sm:text-sm lg:text-base">
+          {order.items.map((item) => (
+            <li key={item.menuId} className="whitespace-nowrap">
+              {item.name}×{item.quantity}
+            </li>
+          ))}
+        </ul>
+        <OrderNumberBadge orderNumber={order.orderNumber} />
+      </div>
+      <button
+        type="button"
+        onClick={() => onBack(order)}
+        className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 rounded-lg bg-orange-100 text-orange-700 font-bold whitespace-nowrap text-xs sm:text-sm lg:text-base px-2.5 py-1 sm:px-3 active:bg-orange-200"
+      >
+        戻す
+      </button>
     </div>
   );
 }

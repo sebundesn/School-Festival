@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Order } from "../type/Order";
-import { subscribeAllOrders, resetCounter, buildCsv } from "@/lib/orders";
+import { subscribeAllOrders, resetCounter, cancelOrder } from "@/lib/orders";
 import { MENU_ITEMS } from "@/lib/menu";
+
+function formatNumber(orderNumber: number) {
+  return String(orderNumber).padStart(3, "0");
+}
 
 export default function AdminPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -13,33 +17,31 @@ export default function AdminPage() {
     return unsubscribe;
   }, []);
 
+  // 受け渡し完了した注文だけを履歴・売上の対象にする（レジでの会計ミス取消や調理中・呼出中は含めない）
+  const completed = useMemo(
+    () =>
+      orders
+        .filter((o) => o.status === "completed")
+        .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0)),
+    [orders]
+  );
+
   const summary = useMemo(() => {
-    const cancelledCount = orders.filter((o) => o.status === "cancelled").length;
-    const valid = orders.filter((o) => o.status !== "cancelled");
-    const totalAmount = valid.reduce((sum, order) => sum + order.totalAmount, 0);
-    const totalCount = valid.reduce(
-      (sum, order) => sum + order.items.reduce((s, item) => s + item.quantity, 0),
-      0
-    );
+    const totalAmount = completed.reduce((sum, order) => sum + order.totalAmount, 0);
 
     const countByMenu = new Map<string, number>();
-    for (const order of valid) {
+    for (const order of completed) {
       for (const item of order.items) {
         countByMenu.set(item.menuId, (countByMenu.get(item.menuId) ?? 0) + item.quantity);
       }
     }
 
-    return { totalAmount, totalCount, countByMenu, orderCount: valid.length, cancelledCount };
-  }, [orders]);
+    return { totalAmount, countByMenu };
+  }, [completed]);
 
-  function handleExportCsv() {
-    const blob = new Blob([buildCsv(orders)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "orders.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+  async function handleCancel(order: Order) {
+    if (!window.confirm(`${formatNumber(order.orderNumber)} の注文を取り消します。よろしいですか？`)) return;
+    await cancelOrder(order.id);
   }
 
   async function handleResetCounter() {
@@ -50,69 +52,74 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 p-6 flex flex-col gap-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold">売上・集計ダッシュボード</h1>
+    <main className="min-h-[calc(100dvh-3rem)] bg-neutral-100 p-3 sm:p-6 flex flex-col gap-3 sm:gap-6 w-full max-w-3xl mx-auto">
+      {/* スマホでも左右に並べる */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="rounded-xl bg-white border border-neutral-300 px-3 py-2 sm:px-5 sm:py-4">
+          <p className="text-sm sm:text-base text-neutral-500">総売上額</p>
+          <p className="text-xl sm:text-3xl font-bold tabular-nums">¥{summary.totalAmount.toLocaleString()}</p>
+        </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="総売上額" value={`¥${summary.totalAmount.toLocaleString()}`} />
-        <StatCard label="累計販売本数" value={`${summary.totalCount}本`} />
-        <StatCard
-          label="注文件数"
-          value={`${summary.orderCount}件`}
-          note={summary.cancelledCount > 0 ? `取消 ${summary.cancelledCount}件を除く` : undefined}
-        />
+        <div className="rounded-xl bg-white border border-neutral-300 px-3 py-2 sm:px-5 sm:py-4">
+          <h2 className="text-sm sm:text-base text-neutral-500 mb-1 sm:mb-2">商品別内訳</h2>
+          <ul className="flex flex-col gap-1">
+            {MENU_ITEMS.map((item) => (
+              <li key={item.id} className="flex justify-between text-base sm:text-lg">
+                <span>{item.name}</span>
+                <span className="font-mono tabular-nums">
+                  {summary.countByMenu.get(item.id) ?? 0}s
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
-      <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4">
-        <h2 className="font-semibold text-neutral-600 mb-3">商品別内訳</h2>
-        <ul className="flex flex-col gap-2">
-          {MENU_ITEMS.map((item) => (
-            <li key={item.id} className="flex justify-between text-lg">
-              <span>{item.name}</span>
-              <span className="font-mono tabular-nums">
-                {summary.countByMenu.get(item.id) ?? 0}本
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4 flex items-center justify-between">
-        <p className="font-semibold">注文データのCSV出力</p>
-        <button
-          type="button"
-          onClick={handleExportCsv}
-          className="rounded-xl bg-neutral-800 text-white font-bold px-5 py-3 active:bg-neutral-900"
-        >
-          ダウンロード
-        </button>
-      </div>
-
-      <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4 flex items-center justify-between">
-        <div>
-          <p className="font-semibold">整理券番号のリセット</p>
-          <p className="text-neutral-500 text-sm">
+      <div className="rounded-xl bg-white border border-neutral-300 px-3 py-2 sm:px-5 sm:py-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm sm:text-base font-semibold">整理券番号のリセット</p>
+          <p className="text-neutral-500 text-xs sm:text-sm">
             過去の注文データは削除されず、次回発行される番号のみ #001 に戻ります。
           </p>
         </div>
         <button
           type="button"
           onClick={handleResetCounter}
-          className="rounded-xl bg-red-600 text-white font-bold px-5 py-3 active:bg-red-700"
+          className="shrink-0 rounded-xl bg-red-600 text-white font-bold text-sm sm:text-base px-3 py-2 sm:px-5 sm:py-3 active:bg-red-700"
         >
           リセット
         </button>
       </div>
-    </main>
-  );
-}
 
-function StatCard({ label, value, note }: { label: string; value: string; note?: string }) {
-  return (
-    <div className="rounded-xl bg-white border border-neutral-300 px-5 py-4">
-      <p className="text-neutral-500">{label}</p>
-      <p className="text-3xl font-bold tabular-nums">{value}</p>
-      {note && <p className="text-neutral-400 text-sm">{note}</p>}
-    </div>
+      <div className="rounded-xl bg-white border border-neutral-300 px-3 py-2 sm:px-5 sm:py-4">
+        <h2 className="text-sm sm:text-base font-semibold text-neutral-600 mb-1 sm:mb-3">注文履歴（受け渡し完了）</h2>
+        {completed.length === 0 ? (
+          <p className="text-sm sm:text-base text-neutral-400">No 注文</p>
+        ) : (
+          <ul className="flex flex-col max-h-[60vh] overflow-y-auto">
+            {completed.map((order) => (
+              <li
+                key={order.id}
+                className="flex items-center gap-2 sm:gap-4 border-b last:border-b-0 border-neutral-200 py-1.5 sm:py-2"
+              >
+                <span className="w-10 sm:w-12 shrink-0 font-mono font-bold text-base sm:text-lg tabular-nums">
+                  {formatNumber(order.orderNumber)}
+                </span>
+                <span className="flex-1 min-w-0 text-sm sm:text-base">
+                  {order.items.map((item) => `${item.name}×${item.quantity}`).join("　")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCancel(order)}
+                  className="shrink-0 rounded-lg bg-red-100 text-red-700 font-bold text-sm sm:text-base px-2.5 py-1 sm:px-4 sm:py-2 active:bg-red-200"
+                >
+                  取消
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </main>
   );
 }
