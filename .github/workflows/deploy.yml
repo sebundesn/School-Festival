@@ -1,0 +1,51 @@
+# main にプッシュすると画面をビルドして公開する（infra/ の反映は手元で terraform apply）。
+# 下の値は `terraform -chdir=infra output` の値。infra を作り直したときは書き換える。
+# どれも秘密ではない（API の URL は配信する画面にも埋め込まれる。操作にはスタッフ用トークンが要る）。
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "infra/**"
+      - "**.md"
+  workflow_dispatch:
+
+# 連続でプッシュしたら古いほうは取り消す
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-1
+  AWS_ROLE_ARN: arn:aws:iam::119539089734:role/yakitori-github-deploy
+  SITE_BUCKET: yakitori-site-20261029150101400300000001
+  DISTRIBUTION_ID: E37A9ZB8BF34WX
+  NEXT_PUBLIC_API_URL: https://h326109w6g.execute-api.ap-northeast-1.amazonaws.com
+  NEXT_PUBLIC_WS_URL: wss://2y6vl7a55j.execute-api.ap-northeast-1.amazonaws.com/prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - run: aws s3 sync out/ "s3://$SITE_BUCKET" --delete
+      - run: aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"

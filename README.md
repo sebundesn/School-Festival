@@ -74,6 +74,8 @@ terraform -chdir=infra output site_url        # これが公開 URL
 
 画面だけを直したときは手順 2 だけ、`infra/` を変えたときは手順 1 からやり直します。
 
+**自動デプロイ**: main にプッシュすると GitHub Actions（`.github/workflows/deploy.yml`）が手順 2 を自動で行います（`infra/` と `.md` だけの変更では動きません。Actions タブの「Run workflow」で手動実行もできます）。AWS には OIDC で入るので、GitHub に鍵は置きません。`infra/` の変更は自動では反映されないので、手順 1 の `terraform apply` は手元で行います。infra を作り直して URL やバケット名が変わったときは、ワークフロー内の値を `terraform -chdir=infra output` の値に書き換えてください。
+
 ### 3. 端末の準備
 
 各端末で最初に開いたときに、スタッフ用トークン（`staff_token`）の入力を求められます。`https://<site_url>/kitchen?token=<staff_token>` のようにトークンを付けた URL を開けば入力しなくて済みます（QR コードで配ると便利です）。トークンはその端末に保存されます。

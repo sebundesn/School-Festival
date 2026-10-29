@@ -22,3 +22,9 @@ variable "protect_data" {
   type        = bool
   default     = true
 }
+
+variable "github_repo" {
+  description = "画面を自動デプロイする GitHub リポジトリ（owner/name）。main ブランチからだけ許可する"
+  type        = string
+  default     = "sebundesn/School-Festival"
+}
