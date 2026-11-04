@@ -1,8 +1,14 @@
-import { BatchWriteCommand, DeleteCommand, GetCommand, PutCommand, QueryCommand, ScanCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { BatchWriteCommand, DeleteCommand, GetCommand, PutCommand, QueryCommand, ScanCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { db, MENU } from "./common.mjs";
 
 const { ORDERS_TABLE, META_TABLE, STAFF_TOKEN } = process.env;
 const STATUSES = ["cooking", "ready", "completed", "cancelled"];
+// 調理中・呼出中のあいだは整理券番号を使用中にして、ほかの注文には出さない
+const ACTIVE_STATUSES = ["cooking", "ready"];
+// 整理券番号は 1〜30 を順に使い、30 の次は 1 に戻る
+const MAX_ORDER_NUMBER = 30;
+// レジの「-100円」ボタン。これ以外の値引き額は受け付けない
+const DISCOUNT = 100;
 
 const res = (code, body, headers = {}) => ({
   statusCode: code,
@@ -34,20 +40,42 @@ export const handler = async (event) => {
         if (m && qty > 0) items.push({ menuId: it.menuId, name: m.name, quantity: qty, pricePerOne: half ? Math.floor(m.price / 2) : m.price });
       }
       if (!items.length) return res(400, { error: "empty order" });
-      const totalAmount = items.reduce((s, i) => s + i.pricePerOne * i.quantity, 0);
-
-      // 採番はアトミックカウンタ。同時会計でも番号は必ず別々になる。
-      const c = await db.send(new UpdateCommand({
-        TableName: META_TABLE, Key: { pk: "counter" },
-        UpdateExpression: "ADD #n :one", ExpressionAttributeNames: { "#n": "n" },
-        ExpressionAttributeValues: { ":one": 1 }, ReturnValues: "UPDATED_NEW",
-      }));
+      const discount = body.discount === DISCOUNT ? DISCOUNT : 0;
+      const totalAmount = Math.max(0, items.reduce((s, i) => s + i.pricePerOne * i.quantity, 0) - discount);
       const order = {
-        orderId: crypto.randomUUID(), orderNumber: c.Attributes.n, items, totalAmount,
+        orderId: crypto.randomUUID(), orderNumber: 0, items, totalAmount,
+        ...(discount ? { discount } : {}),
         status: "cooking", createdAt: new Date().toISOString(),
       };
-      await db.send(new PutCommand({ TableName: ORDERS_TABLE, Item: order, ConditionExpression: "attribute_not_exists(orderId)" }));
-      return res(200, order);
+
+      // 前回出した番号の次から空いている番号を探す。番号ごとの slot#<番号> を条件付きで作って押さえるので、
+      // 同時会計でも同じ番号は出ない（受け渡し完了・取消で slot を消すまで使用中）。
+      // slot ができる前からある調理中・呼出中の注文の番号も避ける。
+      const active = (await Promise.all(ACTIVE_STATUSES.map((s) => readAll((k) => new QueryCommand({
+        TableName: ORDERS_TABLE, IndexName: "by-status",
+        KeyConditionExpression: "#s = :s", ExpressionAttributeNames: { "#s": "status" },
+        ExpressionAttributeValues: { ":s": s }, ExclusiveStartKey: k,
+      }))))).flat();
+      const used = new Set(active.map((o) => o.orderNumber));
+      const last = (await db.send(new GetCommand({ TableName: META_TABLE, Key: { pk: "counter" } }))).Item?.n ?? 0;
+      for (let i = 1; i <= MAX_ORDER_NUMBER; i++) {
+        const num = ((last + i - 1) % MAX_ORDER_NUMBER) + 1;
+        if (used.has(num)) continue;
+        order.orderNumber = num;
+        try {
+          await db.send(new TransactWriteCommand({ TransactItems: [
+            { Put: { TableName: META_TABLE, Item: { pk: slotKey(num), orderId: order.orderId }, ConditionExpression: "attribute_not_exists(pk)" } },
+            { Put: { TableName: ORDERS_TABLE, Item: order, ConditionExpression: "attribute_not_exists(orderId)" } },
+            { Put: { TableName: META_TABLE, Item: { pk: "counter", n: num } } },
+          ] }));
+          return res(200, order);
+        } catch (e) {
+          // ほかの会計に先に取られた。次の番号を試す
+          if (e.name === "TransactionCanceledException") continue;
+          throw e;
+        }
+      }
+      return res(409, { error: "no free number" });
     }
 
     if (method === "GET" && path === "/orders") {
@@ -85,6 +113,14 @@ export const handler = async (event) => {
           requests = out.UnprocessedItems?.[ORDERS_TABLE] ?? [];
         }
       }
+      const slots = Array.from({ length: MAX_ORDER_NUMBER }, (_, i) => ({ DeleteRequest: { Key: { pk: slotKey(i + 1) } } }));
+      for (let i = 0; i < slots.length; i += 25) {
+        let requests = slots.slice(i, i + 25);
+        while (requests.length) {
+          const out = await db.send(new BatchWriteCommand({ RequestItems: { [META_TABLE]: requests } }));
+          requests = out.UnprocessedItems?.[META_TABLE] ?? [];
+        }
+      }
       await db.send(new DeleteCommand({ TableName: META_TABLE, Key: { pk: "stats" } }));
       await db.send(new PutCommand({ TableName: META_TABLE, Item: { pk: "counter", n: 0 } }));
       return res(200, summary);
@@ -109,10 +145,29 @@ export const handler = async (event) => {
         },
       }];
       if (wasCounted !== willCount) tx.push(statsUpdate(o, willCount ? 1 : -1));
+      // 受け渡し完了・取消で番号を空け、そこから調理中・呼出中に戻すときは番号を押さえ直す
+      const wasActive = ACTIVE_STATUSES.includes(o.status);
+      const willActive = ACTIVE_STATUSES.includes(status);
+      const slot = { TableName: META_TABLE, Key: { pk: slotKey(o.orderNumber) } };
+      if (wasActive && !willActive) tx.push({ Delete: slot });
+      if (!wasActive && willActive) {
+        tx.push({
+          Put: {
+            TableName: META_TABLE, Item: { pk: slotKey(o.orderNumber), orderId: id },
+            ConditionExpression: "attribute_not_exists(pk) OR orderId = :id",
+            ExpressionAttributeValues: { ":id": id },
+          },
+        });
+      }
       try {
         await db.send(new TransactWriteCommand({ TransactItems: tx }));
       } catch (e) {
-        if (e.name === "TransactionCanceledException") return res(409, { error: "already changed by another terminal" });
+        if (e.name === "TransactionCanceledException") {
+          // 取り消し理由は TransactItems と同じ順に並ぶ。番号の押さえ直し（最後の項目）で失敗したら番号が使用中
+          const reasons = e.CancellationReasons ?? [];
+          const numberInUse = !wasActive && willActive && reasons[tx.length - 1]?.Code === "ConditionalCheckFailed";
+          return res(409, { error: numberInUse ? "number in use" : "already changed by another terminal" });
+        }
         throw e;
       }
       return res(200, { ...o, status });
@@ -129,8 +184,10 @@ export const handler = async (event) => {
       const items = await readAll((k) => new ScanCommand({ TableName: ORDERS_TABLE, ExclusiveStartKey: k }));
       const jst = (iso) => new Date(iso).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", hour12: false });
       const rows = [["注文ID", "整理券番号", "品物", "本数", "単価", "小計", "ステータス", "注文時刻"]];
-      for (const o of items.sort((a, b) => a.orderNumber - b.orderNumber))
+      for (const o of items.sort((a, b) => a.orderNumber - b.orderNumber)) {
         for (const i of o.items) rows.push([o.orderId, o.orderNumber, i.name, i.quantity, i.pricePerOne, i.quantity * i.pricePerOne, o.status, jst(o.createdAt)]);
+        if (o.discount) rows.push([o.orderId, o.orderNumber, "値引き", 1, -o.discount, -o.discount, o.status, jst(o.createdAt)]);
+      }
       const csv = "﻿" + rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
       return res(200, csv, { "content-type": "text/csv; charset=utf-8" });
     }
@@ -141,6 +198,10 @@ export const handler = async (event) => {
     return res(500, { error: "internal" });
   }
 };
+
+function slotKey(orderNumber) {
+  return `slot#${orderNumber}`;
+}
 
 // content-type が JSON 以外だと API Gateway は本文を base64 で渡してくる
 function parseBody(event) {

@@ -12,6 +12,8 @@ export interface Order {
   orderNumber: number;
   items: OrderItem[];
   totalAmount: number;
+  /** レジの「-100円」で引いた額（totalAmount は値引き後） */
+  discount?: number;
   status: OrderStatus;
   createdAt: Date | null;
 }

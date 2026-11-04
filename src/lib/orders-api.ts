@@ -1,4 +1,5 @@
 import { ClearSummary, Order, OrderItem, OrderStatus } from "@/app/type/Order";
+import { NO_FREE_NUMBER } from "@/lib/menu";
 
 // AWS 実装: 書き込み・取得は HTTP API、他端末の変更は WebSocket で受け取る（infra/ を参照）。
 
@@ -14,6 +15,8 @@ interface ApiOrder extends Omit<Order, "id" | "createdAt"> {
 
 const orders = new Map<string, Order>();
 const listeners = new Set<() => void>();
+// 最初の全件取得が済むまでは画面に渡さない（空の一覧のあとに既存の注文が「新着」として届かないように）
+let loaded = false;
 let socket: WebSocket | null = null;
 let retryCount = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -85,6 +88,7 @@ async function refresh() {
     const list = (await res.json()) as ApiOrder[];
     orders.clear();
     list.forEach((o) => orders.set(o.orderId, toOrder(o)));
+    loaded = true;
     notify();
   } catch {
     // 次の再接続で取り直す
@@ -154,7 +158,9 @@ function sortedOrders(select: (o: Order) => boolean): Order[] {
 }
 
 function subscribe(select: (o: Order) => boolean, callback: (orders: Order[]) => void) {
-  const emit = () => callback(sortedOrders(select));
+  const emit = () => {
+    if (loaded) callback(sortedOrders(select));
+  };
   listeners.add(emit);
   emit();
   connect();
@@ -166,14 +172,16 @@ function subscribe(select: (o: Order) => boolean, callback: (orders: Order[]) =>
 // ---------- 公開 API（orders-local.ts と同じ形） ----------
 
 /** 注文を登録して整理券番号を返す。単価・合計はサーバー側で計算される。 */
-export async function placeOrder(items: OrderItem[], isHalfPrice = false): Promise<number> {
+export async function placeOrder(items: OrderItem[], isHalfPrice = false, discount = 0): Promise<number> {
   const res = await request("/orders", {
     method: "POST",
     body: JSON.stringify({
       items: items.map((i) => ({ menuId: i.menuId, quantity: i.quantity })),
       isHalfPrice,
+      discount,
     }),
   });
+  if (res.status === 409) throw new Error(NO_FREE_NUMBER);
   if (!res.ok) throw new Error(`placeOrder failed: ${res.status}`);
   const order = (await res.json()) as ApiOrder;
   upsert(order);
@@ -199,7 +207,11 @@ export async function setOrderStatus(orderId: string, status: OrderStatus) {
       body: JSON.stringify({ status }),
     });
     if (res.status === 409) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
       await refresh();
+      if (body.error === "number in use") {
+        window.alert("この注文の整理券番号は、ほかの注文が使用中なので戻せません。");
+      }
       return;
     }
     if (!res.ok) throw new Error(`setOrderStatus failed: ${res.status}`);

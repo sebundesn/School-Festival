@@ -3,14 +3,25 @@
 import { useEffect, useState } from "react";
 import { Order } from "../type/Order";
 import { subscribeActiveOrders, setOrderStatus } from "@/lib/orders";
+import { useNewIds, useNotificationSound } from "@/lib/useNotificationSound";
+import SoundOffNotice from "../components/SoundOffNotice";
 
 export default function KitchenPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  // 新しい注文が入ったらライオンの鳴き声を 2 倍速で鳴らす
+  const newOrderSound = useNotificationSound("/lion.mp3", 2);
+  const playNewOrderSound = newOrderSound.play;
+  const findNewOrders = useNewIds();
 
   useEffect(() => {
-    const unsubscribe = subscribeActiveOrders(setOrders);
+    const unsubscribe = subscribeActiveOrders((active) => {
+      setOrders(active);
+      // 呼出中から「戻す」で調理中に戻ったものは新規ではないので、調理中・呼出中の全体で新しく現れたものだけ見る
+      const newIds = new Set(findNewOrders(active.map((order) => order.id)));
+      if (active.some((order) => newIds.has(order.id) && order.status === "cooking")) playNewOrderSound();
+    });
     return unsubscribe;
-  }, []);
+  }, [findNewOrders, playNewOrderSound]);
 
   async function toReady(order: Order) {
     await setOrderStatus(order.id, "ready");
@@ -54,6 +65,7 @@ export default function KitchenPage() {
         </section>
       </div>
 
+      {!newOrderSound.enabled && <SoundOffNotice />}
     </main>
   );
 }

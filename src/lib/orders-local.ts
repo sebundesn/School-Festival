@@ -1,5 +1,5 @@
 import { ClearSummary, Order, OrderItem, OrderStatus } from "@/app/type/Order";
-import { MENU_ITEMS, halfPrice } from "@/lib/menu";
+import { DISCOUNT, MAX_ORDER_NUMBER, MENU_ITEMS, NO_FREE_NUMBER, halfPrice } from "@/lib/menu";
 
 // ローカル実装: ブラウザの localStorage に保存する（バックエンド不要）。
 
@@ -12,6 +12,7 @@ interface StoredOrder extends Omit<Order, "createdAt"> {
 
 interface State {
   orders: StoredOrder[];
+  /** 最後に出した整理券番号 */
   counter: number;
   nextId: number;
 }
@@ -77,9 +78,10 @@ function sortedOrders(select: (o: Order) => boolean): Order[] {
 /**
  * 注文を登録して整理券番号を返す。
  * 品名・単価・合計はクライアントの値を信用せず、MENU_ITEMS から再計算する。
- * isHalfPrice の場合は全品を半額の単価で記録する。
+ * isHalfPrice の場合は全品を半額の単価で記録する。discount は DISCOUNT のときだけ合計から引く。
+ * 番号は前回の次から、調理中・呼出中の注文が使っていないものを選ぶ（30 の次は 1）。
  */
-export async function placeOrder(items: OrderItem[], isHalfPrice = false): Promise<number> {
+export async function placeOrder(items: OrderItem[], isHalfPrice = false, discount = 0): Promise<number> {
   const normalized: OrderItem[] = [];
   for (const item of items) {
     const menu = MENU_ITEMS.find((m) => m.id === item.menuId);
@@ -94,11 +96,26 @@ export async function placeOrder(items: OrderItem[], isHalfPrice = false): Promi
   }
   if (normalized.length === 0) throw new Error("empty order");
 
-  const totalAmount = normalized.reduce((sum, i) => sum + i.pricePerOne * i.quantity, 0);
+  const appliedDiscount = discount === DISCOUNT ? DISCOUNT : 0;
+  const totalAmount = Math.max(
+    0,
+    normalized.reduce((sum, i) => sum + i.pricePerOne * i.quantity, 0) - appliedDiscount
+  );
 
   return withLock(() => {
     const state = readState();
-    const orderNumber = state.counter + 1;
+    const used = new Set(
+      state.orders.filter((o) => o.status === "cooking" || o.status === "ready").map((o) => o.orderNumber)
+    );
+    let orderNumber = 0;
+    for (let i = 1; i <= MAX_ORDER_NUMBER; i++) {
+      const candidate = ((state.counter + i - 1) % MAX_ORDER_NUMBER) + 1;
+      if (!used.has(candidate)) {
+        orderNumber = candidate;
+        break;
+      }
+    }
+    if (orderNumber === 0) throw new Error(NO_FREE_NUMBER);
     writeState({
       counter: orderNumber,
       nextId: state.nextId + 1,
@@ -109,6 +126,7 @@ export async function placeOrder(items: OrderItem[], isHalfPrice = false): Promi
           orderNumber,
           items: normalized,
           totalAmount,
+          ...(appliedDiscount ? { discount: appliedDiscount } : {}),
           status: "cooking",
           createdAt: new Date().toISOString(),
         },
@@ -140,6 +158,18 @@ export function subscribeAllOrders(callback: (orders: Order[]) => void) {
 export async function setOrderStatus(orderId: string, status: OrderStatus) {
   await withLock(() => {
     const state = readState();
+    // 受け渡し完了・取消から戻すとき、番号がほかの注文に使われていたら戻さない
+    const target = state.orders.find((o) => o.id === orderId);
+    const isActive = (s: OrderStatus) => s === "cooking" || s === "ready";
+    if (target && !isActive(target.status) && isActive(status)) {
+      const taken = state.orders.some(
+        (o) => o.id !== orderId && isActive(o.status) && o.orderNumber === target.orderNumber
+      );
+      if (taken) {
+        window.alert("この注文の整理券番号は、ほかの注文が使用中なので戻せません。");
+        return;
+      }
+    }
     writeState({
       ...state,
       orders: state.orders.map((o) => (o.id === orderId ? { ...o, status } : o)),

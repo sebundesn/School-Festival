@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Order } from "./type/Order";
 import { subscribeActiveOrders } from "@/lib/orders";
+import { useNewIds, useNotificationSound } from "@/lib/useNotificationSound";
+import SoundOffNotice from "./components/SoundOffNotice";
 
 // 調理中・受け取り可能がどちらも空のまま、この時間が過ぎたらスライドショーを流す
 const SLIDESHOW_DELAY_MS = 15_000;
@@ -15,14 +17,11 @@ export default function MainPage() {
   const [cookingOrders, setCookingOrders] = useState<Order[]>([]);
   const [readyOrders, setReadyOrders] = useState<Order[]>([]);
   const [idleTimeUp, setIdleTimeUp] = useState(false);
-  // ブラウザは画面を一度タップするまで音を鳴らせないので、それまでタップを促す
-  const [soundEnabled, setSoundEnabled] = useState(false);
-  const readySoundRef = useRef<HTMLAudioElement | null>(null);
-  // 最初の読み込みでは鳴らさないよう、null のあいだは記録だけする
-  const knownReadyIdsRef = useRef<Set<string> | null>(null);
+  const readySound = useNotificationSound("/ani_ge_neko02.mp3");
+  const playReadySound = readySound.play;
+  const findNewReady = useNewIds();
 
   useEffect(() => {
-    readySoundRef.current = new Audio("/ani_ge_neko02.mp3");
     const unsubscribe = subscribeActiveOrders((orders) => {
       const cooking = orders.filter((order) => order.status === "cooking");
       const ready = orders.filter((order) => order.status === "ready");
@@ -30,18 +29,10 @@ export default function MainPage() {
       setReadyOrders(ready);
       // 注文が出てきたらスライドショーを閉じ、次に空になったら 15 秒数え直す
       if (cooking.length > 0 || ready.length > 0) setIdleTimeUp(false);
-
-      const known = knownReadyIdsRef.current;
-      const hasNewReady = known !== null && ready.some((order) => !known.has(order.id));
-      knownReadyIdsRef.current = new Set(ready.map((order) => order.id));
-      if (hasNewReady && readySoundRef.current) {
-        const sound = readySoundRef.current;
-        sound.currentTime = 0;
-        sound.play().catch(() => setSoundEnabled(false));
-      }
+      if (findNewReady(ready.map((order) => order.id)).length > 0) playReadySound();
     });
     return unsubscribe;
-  }, []);
+  }, [findNewReady, playReadySound]);
 
   const isEmpty = cookingOrders.length === 0 && readyOrders.length === 0;
 
@@ -52,22 +43,6 @@ export default function MainPage() {
     const timer = setTimeout(() => setIdleTimeUp(true), SLIDESHOW_DELAY_MS);
     return () => clearTimeout(timer);
   }, [isEmpty]);
-
-  useEffect(() => {
-    if (soundEnabled) return;
-    // タップしたら試しに一度鳴らして、鳴らせることを確かめる
-    const unlock = () => {
-      const sound = readySoundRef.current;
-      if (!sound) return;
-      sound.currentTime = 0;
-      sound
-        .play()
-        .then(() => setSoundEnabled(true))
-        .catch(() => {});
-    };
-    document.addEventListener("pointerdown", unlock);
-    return () => document.removeEventListener("pointerdown", unlock);
-  }, [soundEnabled]);
 
   return (
     <main className="min-h-screen bg-white text-neutral-900 p-8 grid grid-cols-2 gap-8">
@@ -126,11 +101,7 @@ export default function MainPage() {
         />
       )}
 
-      {!soundEnabled && (
-        <p className="fixed bottom-4 right-4 z-50 rounded-full bg-red-600 px-5 py-3 text-lg font-bold text-white shadow-lg">
-          🔇 画面をタップして呼び出し音をオンにしてください
-        </p>
-      )}
+      {!readySound.enabled && <SoundOffNotice />}
     </main>
   );
 }

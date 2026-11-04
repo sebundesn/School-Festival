@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Order, OrderItem } from "../type/Order";
-import { MENU_ITEMS, halfPrice } from "@/lib/menu";
+import { DISCOUNT, MAX_ORDER_NUMBER, MENU_ITEMS, NO_FREE_NUMBER, halfPrice } from "@/lib/menu";
 import { placeOrder, cancelOrder, setOrderStatus, subscribeAllOrders } from "@/lib/orders";
 
 function buildInitialCart(): Record<string, number> {
@@ -12,6 +12,7 @@ function buildInitialCart(): Record<string, number> {
 export default function RegisterPage() {
   const [quantities, setQuantities] = useState<Record<string, number>>(buildInitialCart);
   const [isHalfPrice, setIsHalfPrice] = useState(false);
+  const [isDiscounted, setIsDiscounted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastOrderNumber, setLastOrderNumber] = useState<number | null>(null);
   const [noticeKey, setNoticeKey] = useState(0);
@@ -53,7 +54,11 @@ export default function RegisterPage() {
     })
   );
 
-  const totalAmount = cart.reduce((sum, item) => sum + item.pricePerOne * item.quantity, 0);
+  const discount = isDiscounted ? DISCOUNT : 0;
+  const totalAmount = Math.max(
+    0,
+    cart.reduce((sum, item) => sum + item.pricePerOne * item.quantity, 0) - discount
+  );
   const totalCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   function updateQuantity(menuId: string, delta: number) {
@@ -66,6 +71,7 @@ export default function RegisterPage() {
   function handleClear() {
     setQuantities(buildInitialCart());
     setIsHalfPrice(false);
+    setIsDiscounted(false);
   }
 
   async function handleCheckout() {
@@ -73,13 +79,18 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const orderNumber = await placeOrder(cart, isHalfPrice);
+      const orderNumber = await placeOrder(cart, isHalfPrice, discount);
       setLastOrderNumber(orderNumber);
       setNoticeKey((k) => k + 1);
       setQuantities(buildInitialCart());
       setIsHalfPrice(false);
-    } catch {
-      setError("注文の登録に失敗しました。もう一度お試しください。");
+      setIsDiscounted(false);
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message === NO_FREE_NUMBER
+          ? `整理券番号 1〜${MAX_ORDER_NUMBER} がすべて使用中です。受け渡しが完了してから会計してください。`
+          : "注文の登録に失敗しました。もう一度お試しください。"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -110,10 +121,23 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={handleClear}
-              disabled={isSubmitting || (cart.length === 0 && !isHalfPrice)}
+              disabled={isSubmitting || (cart.length === 0 && !isHalfPrice && !isDiscounted)}
               className="rounded-lg font-bold text-base sm:text-lg px-3 py-1 sm:px-4 sm:py-2 border bg-white border-neutral-300 text-neutral-600 active:bg-neutral-100 disabled:opacity-40"
             >
               クリア
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsDiscounted((v) => !v)}
+              disabled={isSubmitting}
+              aria-pressed={isDiscounted}
+              className={`rounded-lg font-bold text-base sm:text-lg px-3 py-1 sm:px-4 sm:py-2 border disabled:opacity-40 ${
+                isDiscounted
+                  ? "bg-sky-400 border-sky-500 text-sky-950 active:bg-sky-500"
+                  : "bg-white border-neutral-300 text-neutral-600 active:bg-neutral-100"
+              }`}
+            >
+              {isDiscounted ? `-${DISCOUNT}円 ON` : `-${DISCOUNT}円`}
             </button>
             <button
               type="button"
@@ -180,6 +204,7 @@ export default function RegisterPage() {
           <span>
             合計 ({totalCount}セット)
             {isHalfPrice && <span className="ml-2 text-sm sm:text-base text-yellow-700">半額</span>}
+            {isDiscounted && <span className="ml-2 text-sm sm:text-base text-sky-700">-{DISCOUNT}円</span>}
           </span>
           <span>¥{totalAmount}</span>
         </div>
