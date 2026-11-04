@@ -15,8 +15,8 @@ export default function MainPage() {
   const [cookingOrders, setCookingOrders] = useState<Order[]>([]);
   const [readyOrders, setReadyOrders] = useState<Order[]>([]);
   const [idleTimeUp, setIdleTimeUp] = useState(false);
-  // ブラウザは操作前の音声再生を止めるので、鳴らせなかったら画面のタップを促す
-  const [soundBlocked, setSoundBlocked] = useState(false);
+  // ブラウザは画面を一度タップするまで音を鳴らせないので、それまでタップを促す
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const readySoundRef = useRef<HTMLAudioElement | null>(null);
   // 最初の読み込みでは鳴らさないよう、null のあいだは記録だけする
   const knownReadyIdsRef = useRef<Set<string> | null>(null);
@@ -37,7 +37,7 @@ export default function MainPage() {
       if (hasNewReady && readySoundRef.current) {
         const sound = readySoundRef.current;
         sound.currentTime = 0;
-        sound.play().catch(() => setSoundBlocked(true));
+        sound.play().catch(() => setSoundEnabled(false));
       }
     });
     return unsubscribe;
@@ -53,28 +53,24 @@ export default function MainPage() {
     return () => clearTimeout(timer);
   }, [isEmpty]);
 
-  function unlockSound() {
-    const sound = readySoundRef.current;
-    if (!sound) return;
-    // 無音で一度再生しておくと、以降は自動で鳴らせる
-    sound.muted = true;
-    sound
-      .play()
-      .then(() => {
-        sound.pause();
-        sound.currentTime = 0;
-        sound.muted = false;
-        setSoundBlocked(false);
-      })
-      .catch(() => {
-        sound.muted = false;
-      });
-  }
+  useEffect(() => {
+    if (soundEnabled) return;
+    // タップしたら試しに一度鳴らして、鳴らせることを確かめる
+    const unlock = () => {
+      const sound = readySoundRef.current;
+      if (!sound) return;
+      sound.currentTime = 0;
+      sound
+        .play()
+        .then(() => setSoundEnabled(true))
+        .catch(() => {});
+    };
+    document.addEventListener("pointerdown", unlock);
+    return () => document.removeEventListener("pointerdown", unlock);
+  }, [soundEnabled]);
 
   return (
-    <main
-      onClick={unlockSound}
-      className="min-h-screen bg-white text-neutral-900 p-8 grid grid-cols-2 gap-8">
+    <main className="min-h-screen bg-white text-neutral-900 p-8 grid grid-cols-2 gap-8">
       <section className="flex-1 flex flex-col gap-6">
         <h2 className="mt-5 text-3xl md:text-4xl font-bold flex items-center gap-3 text-orange-600">
           <span>🔥</span> 調理中 (COOKING)
@@ -130,9 +126,9 @@ export default function MainPage() {
         />
       )}
 
-      {soundBlocked && (
-        <p className="fixed bottom-4 right-4 z-50 rounded-full bg-neutral-800/80 px-4 py-2 text-sm text-white">
-          🔇 画面をタップすると呼び出し音が鳴るようになります
+      {!soundEnabled && (
+        <p className="fixed bottom-4 right-4 z-50 rounded-full bg-red-600 px-5 py-3 text-lg font-bold text-white shadow-lg">
+          🔇 画面をタップして呼び出し音をオンにしてください
         </p>
       )}
     </main>
