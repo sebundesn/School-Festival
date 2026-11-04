@@ -7,7 +7,7 @@ const STATUSES = ["cooking", "ready", "completed", "cancelled"];
 const ACTIVE_STATUSES = ["cooking", "ready"];
 // 整理券番号は 1〜30 を順に使い、30 の次は 1 に戻る
 const MAX_ORDER_NUMBER = 30;
-// レジの「-100円」ボタン。これ以外の値引き額は受け付けない
+// レジの「-100円」ボタン 1 回分。値引きはこの倍数で、合計を超えない額だけ受け付ける
 const DISCOUNT = 100;
 
 const res = (code, body, headers = {}) => ({
@@ -40,8 +40,12 @@ export const handler = async (event) => {
         if (m && qty > 0) items.push({ menuId: it.menuId, name: m.name, quantity: qty, pricePerOne: half ? Math.floor(m.price / 2) : m.price });
       }
       if (!items.length) return res(400, { error: "empty order" });
-      const discount = body.discount === DISCOUNT ? DISCOUNT : 0;
-      const totalAmount = Math.max(0, items.reduce((s, i) => s + i.pricePerOne * i.quantity, 0) - discount);
+      const subtotal = items.reduce((s, i) => s + i.pricePerOne * i.quantity, 0);
+      const discount = body.discount ?? 0;
+      if (!Number.isInteger(discount) || discount < 0 || discount % DISCOUNT !== 0 || discount > subtotal) {
+        return res(400, { error: "bad discount" });
+      }
+      const totalAmount = subtotal - discount;
       const order = {
         orderId: crypto.randomUUID(), orderNumber: 0, items, totalAmount,
         ...(discount ? { discount } : {}),

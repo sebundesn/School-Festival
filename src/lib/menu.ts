@@ -10,7 +10,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: "shio", name: "塩", pricePerOne: 300 },
 ];
 
-/** レジの「-100円」ボタンで合計から引く額。 */
+/** レジの「-100円」ボタンを 1 回押すごとに合計から引く額。値引きはこの倍数で、合計を超えない。 */
 export const DISCOUNT = 100;
 
 /** 整理券番号は 1〜MAX_ORDER_NUMBER を順に使い、最後まで行ったら 1 に戻る。 */

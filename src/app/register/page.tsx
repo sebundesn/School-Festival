@@ -12,7 +12,8 @@ function buildInitialCart(): Record<string, number> {
 export default function RegisterPage() {
   const [quantities, setQuantities] = useState<Record<string, number>>(buildInitialCart);
   const [isHalfPrice, setIsHalfPrice] = useState(false);
-  const [isDiscounted, setIsDiscounted] = useState(false);
+  // 「-100円」を押した回数
+  const [discountCount, setDiscountCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastOrderNumber, setLastOrderNumber] = useState<number | null>(null);
   const [noticeKey, setNoticeKey] = useState(0);
@@ -54,11 +55,10 @@ export default function RegisterPage() {
     })
   );
 
-  const discount = isDiscounted ? DISCOUNT : 0;
-  const totalAmount = Math.max(
-    0,
-    cart.reduce((sum, item) => sum + item.pricePerOne * item.quantity, 0) - discount
-  );
+  const subtotal = cart.reduce((sum, item) => sum + item.pricePerOne * item.quantity, 0);
+  // 本数を減らして値引きが合計を超えたら、合計までに抑える
+  const discount = Math.min(discountCount * DISCOUNT, Math.floor(subtotal / DISCOUNT) * DISCOUNT);
+  const totalAmount = subtotal - discount;
   const totalCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   function updateQuantity(menuId: string, delta: number) {
@@ -71,7 +71,7 @@ export default function RegisterPage() {
   function handleClear() {
     setQuantities(buildInitialCart());
     setIsHalfPrice(false);
-    setIsDiscounted(false);
+    setDiscountCount(0);
   }
 
   async function handleCheckout() {
@@ -84,7 +84,7 @@ export default function RegisterPage() {
       setNoticeKey((k) => k + 1);
       setQuantities(buildInitialCart());
       setIsHalfPrice(false);
-      setIsDiscounted(false);
+      setDiscountCount(0);
     } catch (e) {
       setError(
         e instanceof Error && e.message === NO_FREE_NUMBER
@@ -121,23 +121,22 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={handleClear}
-              disabled={isSubmitting || (cart.length === 0 && !isHalfPrice && !isDiscounted)}
+              disabled={isSubmitting || (cart.length === 0 && !isHalfPrice && discountCount === 0)}
               className="rounded-lg font-bold text-base sm:text-lg px-3 py-1 sm:px-4 sm:py-2 border bg-white border-neutral-300 text-neutral-600 active:bg-neutral-100 disabled:opacity-40"
             >
               クリア
             </button>
             <button
               type="button"
-              onClick={() => setIsDiscounted((v) => !v)}
-              disabled={isSubmitting}
-              aria-pressed={isDiscounted}
+              onClick={() => setDiscountCount(discount / DISCOUNT + 1)}
+              disabled={isSubmitting || totalAmount < DISCOUNT}
               className={`rounded-lg font-bold text-base sm:text-lg px-3 py-1 sm:px-4 sm:py-2 border disabled:opacity-40 ${
-                isDiscounted
+                discount > 0
                   ? "bg-sky-400 border-sky-500 text-sky-950 active:bg-sky-500"
                   : "bg-white border-neutral-300 text-neutral-600 active:bg-neutral-100"
               }`}
             >
-              {isDiscounted ? `-${DISCOUNT}円 ON` : `-${DISCOUNT}円`}
+              -{DISCOUNT}円
             </button>
             <button
               type="button"
@@ -204,7 +203,16 @@ export default function RegisterPage() {
           <span>
             合計 ({totalCount}セット)
             {isHalfPrice && <span className="ml-2 text-sm sm:text-base text-yellow-700">半額</span>}
-            {isDiscounted && <span className="ml-2 text-sm sm:text-base text-sky-700">-{DISCOUNT}円</span>}
+            {discount > 0 && (
+              <button
+                type="button"
+                onClick={() => setDiscountCount(0)}
+                disabled={isSubmitting}
+                className="ml-2 rounded-md bg-sky-100 px-1.5 text-sm sm:text-base text-sky-800 active:bg-sky-200"
+              >
+                値引き -{discount}円 ✕
+              </button>
+            )}
           </span>
           <span>¥{totalAmount}</span>
         </div>

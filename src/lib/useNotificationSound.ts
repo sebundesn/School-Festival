@@ -1,42 +1,69 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+
+// ブラウザは画面を一度タップするまで音を鳴らせない。タップはページを読み込み直すまで有効で、
+// アプリ内で画面を移っても続くので、鳴らせるかどうかは画面ごとではなくここでまとめて持つ。
+const sounds = new Map<string, HTMLAudioElement>();
+const listeners = new Set<() => void>();
+let unlocked = false;
+let blocked = false;
+
+function notify() {
+  listeners.forEach((listener) => listener());
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function canPlay() {
+  return !blocked && (unlocked || (navigator.userActivation?.hasBeenActive ?? false));
+}
+
+function getSound(src: string) {
+  let sound = sounds.get(src);
+  if (!sound) {
+    sound = new Audio(src);
+    sounds.set(src, sound);
+  }
+  return sound;
+}
 
 /**
- * 通知音。ブラウザは画面を一度タップするまで音を鳴らせないので、
- * enabled が false のあいだは画面のタップを待ち、タップされたら試しに一度鳴らして確かめる。
+ * 通知音。まだ鳴らせない（enabled が false）あいだは画面のタップを待ち、
+ * タップされたら試しに一度鳴らして確かめる。
  */
 export function useNotificationSound(src: string, playbackRate = 1) {
-  const [enabled, setEnabled] = useState(false);
-  const soundRef = useRef<HTMLAudioElement | null>(null);
+  const enabled = useSyncExternalStore(subscribe, canPlay, () => false);
 
-  useEffect(() => {
-    const sound = new Audio(src);
+  const play = useCallback(() => {
+    const sound = getSound(src);
     // 読み込み時に playbackRate は defaultPlaybackRate に戻るので両方に入れる
     sound.defaultPlaybackRate = playbackRate;
     sound.playbackRate = playbackRate;
-    soundRef.current = sound;
-  }, [src, playbackRate]);
-
-  const play = useCallback(() => {
-    const sound = soundRef.current;
-    if (!sound) return Promise.resolve(false);
     sound.currentTime = 0;
-    sound.playbackRate = playbackRate;
     return sound.play().then(
-      () => true,
       () => {
-        setEnabled(false);
+        unlocked = true;
+        blocked = false;
+        notify();
+        return true;
+      },
+      () => {
+        blocked = true;
+        notify();
         return false;
       }
     );
-  }, [playbackRate]);
+  }, [src, playbackRate]);
 
   useEffect(() => {
     if (enabled) return;
-    const unlock = () => {
-      play().then((ok) => ok && setEnabled(true));
-    };
+    const unlock = () => void play();
     document.addEventListener("pointerdown", unlock);
     return () => document.removeEventListener("pointerdown", unlock);
   }, [enabled, play]);

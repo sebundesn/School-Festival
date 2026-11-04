@@ -78,7 +78,7 @@ function sortedOrders(select: (o: Order) => boolean): Order[] {
 /**
  * 注文を登録して整理券番号を返す。
  * 品名・単価・合計はクライアントの値を信用せず、MENU_ITEMS から再計算する。
- * isHalfPrice の場合は全品を半額の単価で記録する。discount は DISCOUNT のときだけ合計から引く。
+ * isHalfPrice の場合は全品を半額の単価で記録する。discount は合計から引く（DISCOUNT の倍数で合計以下）。
  * 番号は前回の次から、調理中・呼出中の注文が使っていないものを選ぶ（30 の次は 1）。
  */
 export async function placeOrder(items: OrderItem[], isHalfPrice = false, discount = 0): Promise<number> {
@@ -96,11 +96,11 @@ export async function placeOrder(items: OrderItem[], isHalfPrice = false, discou
   }
   if (normalized.length === 0) throw new Error("empty order");
 
-  const appliedDiscount = discount === DISCOUNT ? DISCOUNT : 0;
-  const totalAmount = Math.max(
-    0,
-    normalized.reduce((sum, i) => sum + i.pricePerOne * i.quantity, 0) - appliedDiscount
-  );
+  const subtotal = normalized.reduce((sum, i) => sum + i.pricePerOne * i.quantity, 0);
+  if (!Number.isInteger(discount) || discount < 0 || discount % DISCOUNT !== 0 || discount > subtotal) {
+    throw new Error("bad discount");
+  }
+  const totalAmount = subtotal - discount;
 
   return withLock(() => {
     const state = readState();
@@ -126,7 +126,7 @@ export async function placeOrder(items: OrderItem[], isHalfPrice = false, discou
           orderNumber,
           items: normalized,
           totalAmount,
-          ...(appliedDiscount ? { discount: appliedDiscount } : {}),
+          ...(discount ? { discount } : {}),
           status: "cooking",
           createdAt: new Date().toISOString(),
         },
