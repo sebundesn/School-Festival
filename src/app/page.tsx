@@ -80,7 +80,7 @@ export default function MainPage() {
           {readyOrders.map((order) => (
             <div
               key={order.id}
-              className="min-w-32 rounded-2xl bg-emerald-100 border-2 border-emerald-500 px-6 py-5 text-center animate-pulse"
+              className="min-w-32 rounded-2xl bg-emerald-100 border-2 border-emerald-500 px-6 py-5 text-center"
             >
               <p className="text-4xl md:text-5xl font-mono font-bold tabular-nums text-emerald-800">
                 {formatOrderNumber(order.orderNumber)}

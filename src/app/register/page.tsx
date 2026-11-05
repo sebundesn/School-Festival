@@ -103,10 +103,10 @@ export default function RegisterPage() {
         <div
           key={noticeKey}
           role="status"
-          className="notice-fade pointer-events-none fixed top-14 left-1/2 -translate-x-1/2 z-[60] flex items-baseline gap-1 whitespace-nowrap rounded-lg bg-emerald-100 border border-emerald-400 shadow-lg px-3 py-1.5 text-emerald-900 text-sm"
+          className="notice-fade pointer-events-none fixed top-14 left-1/2 -translate-x-1/2 z-[60] flex items-baseline gap-2 whitespace-nowrap rounded-xl bg-emerald-100 border-2 border-emerald-400 shadow-lg px-5 py-2 text-emerald-900 text-lg"
         >
           発行番号
-          <span className="font-mono font-bold text-xl">
+          <span className="font-mono font-bold text-4xl">
             {String(lastOrderNumber).padStart(3, "0")}
           </span>
         </div>
