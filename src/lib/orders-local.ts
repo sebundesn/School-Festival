@@ -68,11 +68,16 @@ function toOrder(o: StoredOrder): Order {
   return { ...o, createdAt: o.createdAt ? new Date(o.createdAt) : null };
 }
 
+/** 到着順（注文を受けた時刻順）。整理券番号は 30 の次が 1 に戻るので番号順では並ばない。 */
+function byArrival(a: Order, b: Order) {
+  return (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0) || a.orderNumber - b.orderNumber;
+}
+
 function sortedOrders(select: (o: Order) => boolean): Order[] {
   return readState()
     .orders.map(toOrder)
     .filter(select)
-    .sort((a, b) => a.orderNumber - b.orderNumber);
+    .sort(byArrival);
 }
 
 /**

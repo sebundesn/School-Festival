@@ -22,7 +22,9 @@ export default function MainPage() {
   const findNewReady = useNewIds();
 
   useEffect(() => {
-    const unsubscribe = subscribeActiveOrders((orders) => {
+    const unsubscribe = subscribeActiveOrders((active) => {
+      // お客さん用画面は自分の番号を探しやすいよう番号順のまま
+      const orders = [...active].sort((a, b) => a.orderNumber - b.orderNumber);
       const cooking = orders.filter((order) => order.status === "cooking");
       const ready = orders.filter((order) => order.status === "ready");
       setCookingOrders(cooking);
