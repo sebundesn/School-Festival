@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Order } from "../type/Order";
-import { subscribeAllOrders, resetCounter, setOrderStatus, cancelOrder, clearAllOrders } from "@/lib/orders";
+import { subscribeAllOrders, cancelOrder, clearAllOrders } from "@/lib/orders";
 import { MENU_ITEMS } from "@/lib/menu";
 
 function formatNumber(orderNumber: number) {
@@ -50,24 +50,12 @@ export default function AdminPage() {
     return { totalAmount, countByMenu };
   }, [completed]);
 
-  // 受け渡しを押し間違えたときに調理中へ戻す（履歴・売上からも外れる）
-  async function handleBackToCooking(order: Order) {
-    await setOrderStatus(order.id, "cooking");
-  }
-
   // 履歴から消す（取消扱いにするので売上・セット数からも外れる）
   async function handleDelete(order: Order) {
     if (!window.confirm(`#${formatNumber(order.orderNumber)} の注文を履歴から削除します。売上からも外れます。よろしいですか？`)) {
       return;
     }
     await cancelOrder(order.id);
-  }
-
-  async function handleResetCounter() {
-    if (!window.confirm("整理券番号のカウンターを 0 にリセットします。よろしいですか？")) {
-      return;
-    }
-    await resetCounter();
   }
 
   // 片付け用。パスワードを確かめてから消し、売上・セット数をアラートで出して記録してもらう
@@ -110,22 +98,6 @@ export default function AdminPage() {
 
       <div className="rounded-xl bg-white border border-neutral-300 px-3 py-2 sm:px-5 sm:py-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm sm:text-base font-semibold">整理券番号のリセット</p>
-          <p className="text-neutral-500 text-xs sm:text-sm">
-            過去の注文データは削除されず、次回発行される番号のみ #001 に戻ります。
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleResetCounter}
-          className="shrink-0 rounded-xl bg-red-600 text-white font-bold text-sm sm:text-base px-3 py-2 sm:px-5 sm:py-3 active:bg-red-700"
-        >
-          リセット
-        </button>
-      </div>
-
-      <div className="rounded-xl bg-white border border-neutral-300 px-3 py-2 sm:px-5 sm:py-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
           <p className="text-sm sm:text-base font-semibold">全注文の削除</p>
           <p className="text-neutral-500 text-xs sm:text-sm">
             パスワードを入れると全端末の注文と集計を消し、売上・セット数を表示します。片付け用です。
@@ -161,13 +133,6 @@ export default function AdminPage() {
                 <span className="flex-1 min-w-0 text-sm sm:text-base">
                   {order.items.map((item) => `${item.name}×${item.quantity}`).join("　")}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => handleBackToCooking(order)}
-                  className="shrink-0 whitespace-nowrap rounded-lg bg-orange-100 text-orange-700 font-bold text-sm sm:text-base px-2.5 py-1 sm:px-4 sm:py-2 active:bg-orange-200"
-                >
-                  調理中に戻す
-                </button>
               </li>
             ))}
           </ul>
