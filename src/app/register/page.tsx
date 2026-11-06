@@ -95,7 +95,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-3rem)] bg-neutral-100 p-3 sm:p-6 grid grid-cols-1 gap-3 sm:gap-6 items-start lg:w-[60vw] lg:mx-auto">
+    <main className="min-h-[calc(100dvh-3rem)] bg-neutral-100 p-3 pb-0 sm:p-6 sm:pb-0 lg:pb-6 grid grid-cols-1 grid-rows-[1fr_auto] lg:grid-rows-none gap-3 sm:gap-6 items-start lg:w-[60vw] lg:mx-auto">
       {/* 発行番号はナビの下に重ねて出すので、表示されても下のレイアウトは動かない */}
       {lastOrderNumber !== null && (
         <div
@@ -111,8 +111,8 @@ export default function RegisterPage() {
       )}
 
       {/* セット数の入力と注文内容の確認を 1 つのパネルにまとめる。
-          スマホ・タブレットは調理中の注文の下に置き、画面下に貼り付けて上に重ねる */}
-      <section className="order-last sticky bottom-3 z-20 lg:order-none lg:static rounded-2xl bg-white border border-neutral-300 shadow-lg px-4 sm:px-5 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4">
+          スマホ・タブレットは調理中の注文の下に置き、画面の下端に隙間なく貼り付けて上に重ねる */}
+      <section className="order-last sticky bottom-0 z-20 -mx-3 sm:-mx-6 lg:mx-0 lg:order-none lg:static rounded-t-2xl lg:rounded-2xl bg-white border-t lg:border border-neutral-300 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] lg:shadow-lg px-4 sm:px-5 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm sm:text-base font-semibold text-neutral-600">注文内容確認</h2>
           <div className="flex items-center gap-2">
@@ -224,12 +224,11 @@ export default function RegisterPage() {
       <section className="flex flex-col gap-2 min-h-0 bg-white border border-neutral-300 rounded-2xl shadow-lg p-3 sm:p-4 lg:fixed lg:top-12 lg:bottom-0 lg:right-0 lg:w-[20vw] lg:rounded-none lg:border-0 lg:border-l lg:p-4">
         <h2 className="text-sm sm:text-base font-semibold text-orange-600">🔥 調理中（取消・受け渡し完了）</h2>
         {cookingOrders.length === 0 && <p className="text-sm sm:text-base text-neutral-400">No 注文</p>}
-        {/* スマホは 4 行分の高さまでで、それ以上はスクロール */}
-        <ul className="flex flex-col max-h-[10.5rem] sm:max-h-none overflow-y-auto lg:flex-1 lg:min-h-0">
+        <ul className="flex flex-col overflow-y-auto lg:flex-1 lg:min-h-0">
           {cookingOrders.map((order) => (
             <li
               key={order.id}
-              className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b last:border-b-0 border-neutral-200 py-1.5 sm:py-2"
+              className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b last:border-b-0 border-neutral-200 py-1 sm:py-2"
             >
               <button
                 type="button"
