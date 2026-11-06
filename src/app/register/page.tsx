@@ -21,11 +21,14 @@ export default function RegisterPage() {
 
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [readyOrders, setReadyOrders] = useState<Order[]>([]);
+  const [cookingOrders, setCookingOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     return subscribeAllOrders((orders) => {
       // 会計ミスの取消対象は調理中の注文だけ（呼出中・受け渡し完了・取消済みは出さない）
-      setRecentOrders(orders.filter((order) => order.status === "cooking").slice(-5).reverse());
+      const cooking = orders.filter((order) => order.status === "cooking");
+      setRecentOrders(cooking.slice(-5).reverse());
+      setCookingOrders(cooking);
       setReadyOrders(orders.filter((order) => order.status === "ready"));
     });
   }, []);
@@ -199,32 +202,35 @@ export default function RegisterPage() {
           })}
         </ul>
 
-        <div className="flex justify-between text-lg sm:text-2xl font-bold">
-          <span>
-            合計 ({totalCount}セット)
-            {isHalfPrice && <span className="ml-2 text-sm sm:text-base text-yellow-700">半額</span>}
-            {discount > 0 && (
-              <button
-                type="button"
-                onClick={() => setDiscountCount(0)}
-                disabled={isSubmitting}
-                className="ml-2 rounded-md bg-sky-100 px-1.5 text-sm sm:text-base text-sky-800 active:bg-sky-200"
-              >
-                値引き -{discount}円 ✕
-              </button>
-            )}
-          </span>
-          <span>¥{totalAmount}</span>
-        </div>
+        {/* スマホは合計と会計確定を 1 行に並べて、画面下のパネルを低くする */}
+        <div className="flex items-center gap-3 sm:flex-col sm:items-stretch sm:gap-4">
+          <div className="flex-1 min-w-0 flex items-center justify-between gap-2 text-lg sm:text-2xl font-bold">
+            <span>
+              合計 ({totalCount}セット)
+              {isHalfPrice && <span className="ml-2 text-sm sm:text-base text-yellow-700">半額</span>}
+              {discount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setDiscountCount(0)}
+                  disabled={isSubmitting}
+                  className="ml-2 rounded-md bg-sky-100 px-1.5 text-sm sm:text-base text-sky-800 active:bg-sky-200"
+                >
+                  値引き -{discount}円 ✕
+                </button>
+              )}
+            </span>
+            <span className="shrink-0">¥{totalAmount}</span>
+          </div>
 
-        <button
-          type="button"
-          onClick={handleCheckout}
-          disabled={isSubmitting || cart.length === 0}
-          className="w-full rounded-2xl bg-orange-600 text-white text-lg sm:text-2xl font-bold py-2.5 sm:py-4 active:bg-orange-700 disabled:opacity-40"
-        >
-          {isSubmitting ? "登録中..." : "会計確定"}
-        </button>
+          <button
+            type="button"
+            onClick={handleCheckout}
+            disabled={isSubmitting || cart.length === 0}
+            className="shrink-0 sm:w-full rounded-2xl bg-orange-600 text-white text-lg sm:text-2xl font-bold px-5 py-2.5 sm:py-4 active:bg-orange-700 disabled:opacity-40"
+          >
+            {isSubmitting ? "登録中..." : "会計確定"}
+          </button>
+        </div>
       </section>
 
       <div className="lg:contents grid grid-cols-1 gap-4 bg-white border border-neutral-300 rounded-2xl shadow-lg p-3 sm:p-4 lg:p-0 lg:bg-transparent lg:border-0 lg:shadow-none">
@@ -249,6 +255,18 @@ export default function RegisterPage() {
                 </button>
               </div>
             ))}
+          </div>
+          {/* スマホは調理中の番号もここに並べ、全体の進み具合を一目で見られるようにする */}
+          <div className="sm:hidden border-t border-neutral-200 pt-2 flex flex-col gap-1">
+            <h3 className="text-sm font-semibold text-orange-600">🔥 調理中</h3>
+            {cookingOrders.length === 0 && <p className="text-sm text-neutral-400">No 注文</p>}
+            <div className="flex flex-wrap gap-x-3 gap-y-1 max-h-[4.5rem] overflow-y-auto">
+              {cookingOrders.map((order) => (
+                <span key={order.id} className="font-mono font-bold text-lg text-neutral-500">
+                  {String(order.orderNumber).padStart(3, "0")}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 
