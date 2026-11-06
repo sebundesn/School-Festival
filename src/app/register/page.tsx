@@ -158,34 +158,32 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {/* タレ・塩を 1 行に並べる */}
+        {/* タレ・塩を 1 行に並べ、それぞれ「− 品名 本数 +」の順に置く */}
         <ul className="grid grid-cols-2 gap-x-3 sm:gap-x-6 border-b border-neutral-200 pb-1.5 sm:pb-2">
           {MENU_ITEMS.map((item) => {
             const quantity = quantities[item.id];
             return (
               <li key={item.id} className="flex items-center justify-between gap-1.5 sm:gap-3">
-                <p className="min-w-0 text-base sm:text-lg font-semibold whitespace-nowrap">{item.name}</p>
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateQuantity(item.id, -1)}
-                    disabled={isSubmitting || quantity === 0}
-                    className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full bg-neutral-200 text-xl sm:text-2xl font-bold active:bg-neutral-300 disabled:opacity-40"
-                  >
-                    −
-                  </button>
-                  <span className="w-7 sm:w-8 text-center text-xl sm:text-2xl font-mono tabular-nums">
-                    {quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => updateQuantity(item.id, 1)}
-                    disabled={isSubmitting}
-                    className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full bg-orange-500 text-white text-xl sm:text-2xl font-bold active:bg-orange-600 disabled:opacity-40"
-                  >
-                    +
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => updateQuantity(item.id, -1)}
+                  disabled={isSubmitting || quantity === 0}
+                  className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full bg-neutral-200 text-xl sm:text-2xl font-bold active:bg-neutral-300 disabled:opacity-40"
+                >
+                  −
+                </button>
+                <span className="flex items-baseline gap-1.5 sm:gap-2 whitespace-nowrap">
+                  <span className="text-base sm:text-lg font-semibold">{item.name}</span>
+                  <span className="w-6 sm:w-8 text-center text-xl sm:text-2xl font-mono tabular-nums">{quantity}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => updateQuantity(item.id, 1)}
+                  disabled={isSubmitting}
+                  className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full bg-orange-500 text-white text-xl sm:text-2xl font-bold active:bg-orange-600 disabled:opacity-40"
+                >
+                  +
+                </button>
               </li>
             );
           })}
@@ -244,7 +242,9 @@ export default function RegisterPage() {
                 <span className="font-mono font-bold text-lg sm:text-2xl">
                   {String(order.orderNumber).padStart(3, "0")}
                 </span>
-                <span className="text-xs sm:text-sm text-neutral-500">¥{order.totalAmount}</span>
+                <span className="text-xs sm:text-sm text-neutral-600 whitespace-nowrap">
+                  {order.items.map((item) => `${item.name}${item.quantity}`).join(" ")}
+                </span>
               </span>
               <button
                 type="button"

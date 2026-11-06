@@ -150,7 +150,7 @@ function subscribe(select: (o: Order) => boolean, callback: (orders: Order[]) =>
   };
 }
 
-/** 調理中の注文 — モニター画面と厨房画面。 */
+/** 調理中の注文 — モニター画面。 */
 export function subscribeActiveOrders(callback: (orders: Order[]) => void) {
   return subscribe((o) => o.status === "cooking", callback);
 }
