@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Order } from "../type/Order";
-import { subscribeAllOrders, resetCounter, setOrderStatus, clearAllOrders } from "@/lib/orders";
+import { subscribeAllOrders, resetCounter, setOrderStatus, cancelOrder, clearAllOrders } from "@/lib/orders";
 import { MENU_ITEMS } from "@/lib/menu";
 
 function formatNumber(orderNumber: number) {
@@ -53,6 +53,14 @@ export default function AdminPage() {
   // 受け渡しを押し間違えたときに調理中へ戻す（履歴・売上からも外れる）
   async function handleBackToCooking(order: Order) {
     await setOrderStatus(order.id, "cooking");
+  }
+
+  // 履歴から消す（取消扱いにするので売上・セット数からも外れる）
+  async function handleDelete(order: Order) {
+    if (!window.confirm(`#${formatNumber(order.orderNumber)} の注文を履歴から削除します。売上からも外れます。よろしいですか？`)) {
+      return;
+    }
+    await cancelOrder(order.id);
   }
 
   async function handleResetCounter() {
@@ -143,9 +151,13 @@ export default function AdminPage() {
                 key={order.id}
                 className="flex items-center gap-2 sm:gap-4 border-b last:border-b-0 border-neutral-200 py-1.5 sm:py-2"
               >
-                <span className="w-10 sm:w-12 shrink-0 font-mono font-bold text-base sm:text-lg tabular-nums">
-                  {formatNumber(order.orderNumber)}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(order)}
+                  className="shrink-0 whitespace-nowrap rounded-lg bg-red-100 text-red-700 font-bold text-sm sm:text-base px-2.5 py-1 sm:px-4 sm:py-2 active:bg-red-200"
+                >
+                  削除
+                </button>
                 <span className="flex-1 min-w-0 text-sm sm:text-base">
                   {order.items.map((item) => `${item.name}×${item.quantity}`).join("　")}
                 </span>
