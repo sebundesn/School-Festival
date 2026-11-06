@@ -16,7 +16,7 @@ export default function KitchenPage() {
   useEffect(() => {
     const unsubscribe = subscribeActiveOrders((active) => {
       setOrders(active);
-      // 呼出中から「戻す」で調理中に戻ったものは新規ではないので、調理中・呼出中の全体で新しく現れたものだけ見る
+      // 呼出中から調理中に戻ったものは新規ではないので、調理中・呼出中の全体で新しく現れたものだけ見る
       const newIds = new Set(findNewOrders(active.map((order) => order.id)));
       if (active.some((order) => newIds.has(order.id) && order.status === "cooking")) playNewOrderSound();
     });
@@ -27,43 +27,23 @@ export default function KitchenPage() {
     await setOrderStatus(order.id, "ready");
   }
 
-  async function backToCooking(order: Order) {
-    await setOrderStatus(order.id, "cooking");
-  }
-
   const cookingOrders = orders.filter((order) => order.status === "cooking");
-  const readyOrders = orders.filter((order) => order.status === "ready");
 
   return (
     <main className="h-[calc(100dvh-3rem)] overflow-hidden bg-neutral-100 p-2 sm:p-4 lg:p-6 flex flex-col gap-2 sm:gap-3 lg:gap-6">
-      {/* スマホ・タブレットは上下分割、PC は左右分割。カードの大きさは画面幅ごとに固定（件数で動かない） */}
-      <div className="flex-1 min-h-0 grid grid-rows-[minmax(0,3fr)_minmax(0,2fr)] lg:grid-rows-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2 sm:gap-3 lg:gap-6">
-        <section className="flex flex-col gap-2 lg:gap-3 min-h-0 rounded-2xl bg-orange-50 border-2 border-orange-200 p-2 sm:p-3 lg:p-4">
-          <SectionHeading className="text-orange-600" label="🔥 調理中" count={cookingOrders.length} />
-          {cookingOrders.length === 0 ? (
-            <EmptyState className="text-orange-600" />
-          ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 content-start">
-              {cookingOrders.map((order) => (
-                <OrderCard key={order.id} order={order} onAdvance={toReady} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="flex flex-col gap-2 lg:gap-3 min-h-0 rounded-2xl bg-emerald-50 border-2 border-emerald-200 p-2 sm:p-3 lg:p-4">
-          <SectionHeading className="text-emerald-600" label="🔔 呼出中" count={readyOrders.length} />
-          {readyOrders.length === 0 ? (
-            <EmptyState className="text-emerald-600" />
-          ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-3 content-start">
-              {readyOrders.map((order) => (
-                <ReadyTile key={order.id} order={order} onBack={backToCooking} />
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+      {/* 調理中だけを画面いっぱいに出す。カードの大きさは画面幅ごとに固定（件数で動かない） */}
+      <section className="flex-1 flex flex-col gap-2 lg:gap-3 min-h-0 rounded-2xl bg-orange-50 border-2 border-orange-200 p-2 sm:p-3 lg:p-4">
+        <SectionHeading className="text-orange-600" label="🔥 調理中" count={cookingOrders.length} />
+        {cookingOrders.length === 0 ? (
+          <EmptyState className="text-orange-600" />
+        ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 content-start">
+            {cookingOrders.map((order) => (
+              <OrderCard key={order.id} order={order} onAdvance={toReady} />
+            ))}
+          </div>
+        )}
+      </section>
 
       {!newOrderSound.enabled && <SoundOffNotice />}
     </main>
@@ -91,7 +71,7 @@ function EmptyState({ className }: { className: string }) {
   );
 }
 
-// カードの隅に添える小さい注文番号（厨房カード・呼出中タイルで同じサイズ）
+// カードの隅に添える小さい注文番号
 function OrderNumberBadge({ orderNumber }: { orderNumber: number }) {
   return (
     <span className="shrink-0 font-mono font-semibold tabular-nums leading-none text-neutral-500 text-xs sm:text-sm lg:text-base">
@@ -121,30 +101,6 @@ function OrderCard({ order, onAdvance }: { order: Order; onAdvance: (order: Orde
         className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 rounded-lg bg-emerald-600 text-white font-bold whitespace-nowrap text-xs sm:text-sm lg:text-base px-2.5 py-1 sm:px-3 active:opacity-80"
       >
         呼出中に
-      </button>
-    </div>
-  );
-}
-
-function ReadyTile({ order, onBack }: { order: Order; onBack: (order: Order) => void }) {
-  return (
-    <div className="relative rounded-xl bg-white border-2 border-emerald-300 p-1.5 sm:p-2 pb-9 sm:pb-10 lg:pb-11">
-      <div className="flex items-start gap-1.5">
-        <ul className="flex-1 text-center font-semibold leading-tight text-neutral-600 text-xs sm:text-sm lg:text-base">
-          {order.items.map((item) => (
-            <li key={item.menuId} className="whitespace-nowrap">
-              {item.name}×{item.quantity}
-            </li>
-          ))}
-        </ul>
-        <OrderNumberBadge orderNumber={order.orderNumber} />
-      </div>
-      <button
-        type="button"
-        onClick={() => onBack(order)}
-        className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 rounded-lg bg-orange-100 text-orange-700 font-bold whitespace-nowrap text-xs sm:text-sm lg:text-base px-2.5 py-1 sm:px-3 active:bg-orange-200"
-      >
-        戻す
       </button>
     </div>
   );

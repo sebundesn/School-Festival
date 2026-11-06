@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/register", label: "レジ" },
-  { href: "/kitchen", label: "厨房" },
+  { href: "/kitchen", label: "注文内容" },
   { href: "/admin", label: "管理" },
 ];
 
