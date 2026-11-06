@@ -194,7 +194,7 @@ export async function placeOrder(items: OrderItem[], isHalfPrice = false, discou
 }
 
 export function subscribeActiveOrders(callback: (orders: Order[]) => void) {
-  return subscribe((o) => o.status === "cooking" || o.status === "ready", callback);
+  return subscribe((o) => o.status === "cooking", callback);
 }
 
 export function subscribeAllOrders(callback: (orders: Order[]) => void) {

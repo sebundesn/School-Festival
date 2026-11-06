@@ -84,7 +84,7 @@ function sortedOrders(select: (o: Order) => boolean): Order[] {
  * 注文を登録して整理券番号を返す。
  * 品名・単価・合計はクライアントの値を信用せず、MENU_ITEMS から再計算する。
  * isHalfPrice の場合は全品を半額の単価で記録する。discount は合計から引く（DISCOUNT の倍数で合計以下）。
- * 番号は前回の次から、調理中・呼出中の注文が使っていないものを選ぶ（30 の次は 1）。
+ * 番号は前回の次から、調理中の注文が使っていないものを選ぶ（30 の次は 1）。
  */
 export async function placeOrder(items: OrderItem[], isHalfPrice = false, discount = 0): Promise<number> {
   const normalized: OrderItem[] = [];
@@ -110,7 +110,7 @@ export async function placeOrder(items: OrderItem[], isHalfPrice = false, discou
   return withLock(() => {
     const state = readState();
     const used = new Set(
-      state.orders.filter((o) => o.status === "cooking" || o.status === "ready").map((o) => o.orderNumber)
+      state.orders.filter((o) => o.status === "cooking").map((o) => o.orderNumber)
     );
     let orderNumber = 0;
     for (let i = 1; i <= MAX_ORDER_NUMBER; i++) {
@@ -150,9 +150,9 @@ function subscribe(select: (o: Order) => boolean, callback: (orders: Order[]) =>
   };
 }
 
-/** 調理中・お渡し可能の注文 — モニター画面と厨房画面。 */
+/** 調理中の注文 — モニター画面と厨房画面。 */
 export function subscribeActiveOrders(callback: (orders: Order[]) => void) {
-  return subscribe((o) => o.status === "cooking" || o.status === "ready", callback);
+  return subscribe((o) => o.status === "cooking", callback);
 }
 
 /** 取消を含む全注文 — 管理画面・レジの履歴。 */
@@ -165,7 +165,7 @@ export async function setOrderStatus(orderId: string, status: OrderStatus) {
     const state = readState();
     // 受け渡し完了・取消から戻すとき、番号がほかの注文に使われていたら戻さない
     const target = state.orders.find((o) => o.id === orderId);
-    const isActive = (s: OrderStatus) => s === "cooking" || s === "ready";
+    const isActive = (s: OrderStatus) => s === "cooking";
     if (target && !isActive(target.status) && isActive(status)) {
       const taken = state.orders.some(
         (o) => o.id !== orderId && isActive(o.status) && o.orderNumber === target.orderNumber

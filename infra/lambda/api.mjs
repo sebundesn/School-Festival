@@ -2,9 +2,9 @@ import { BatchWriteCommand, DeleteCommand, GetCommand, PutCommand, QueryCommand,
 import { db, MENU } from "./common.mjs";
 
 const { ORDERS_TABLE, META_TABLE, STAFF_TOKEN } = process.env;
-const STATUSES = ["cooking", "ready", "completed", "cancelled"];
-// 調理中・呼出中のあいだは整理券番号を使用中にして、ほかの注文には出さない
-const ACTIVE_STATUSES = ["cooking", "ready"];
+const STATUSES = ["cooking", "completed", "cancelled"];
+// 調理中のあいだは整理券番号を使用中にして、ほかの注文には出さない
+const ACTIVE_STATUSES = ["cooking"];
 // 整理券番号は 1〜30 を順に使い、30 の次は 1 に戻る
 const MAX_ORDER_NUMBER = 30;
 // レジの「-100円」ボタン 1 回分。値引きはこの倍数で、合計を超えない額だけ受け付ける
@@ -54,7 +54,7 @@ export const handler = async (event) => {
 
       // 前回出した番号の次から空いている番号を探す。番号ごとの slot#<番号> を条件付きで作って押さえるので、
       // 同時会計でも同じ番号は出ない（受け渡し完了・取消で slot を消すまで使用中）。
-      // slot ができる前からある調理中・呼出中の注文の番号も避ける。
+      // slot ができる前からある調理中の注文の番号も避ける。
       const active = (await Promise.all(ACTIVE_STATUSES.map((s) => readAll((k) => new QueryCommand({
         TableName: ORDERS_TABLE, IndexName: "by-status",
         KeyConditionExpression: "#s = :s", ExpressionAttributeNames: { "#s": "status" },
@@ -149,7 +149,7 @@ export const handler = async (event) => {
         },
       }];
       if (wasCounted !== willCount) tx.push(statsUpdate(o, willCount ? 1 : -1));
-      // 受け渡し完了・取消で番号を空け、そこから調理中・呼出中に戻すときは番号を押さえ直す
+      // 受け渡し完了・取消で番号を空け、そこから調理中に戻すときは番号を押さえ直す
       const wasActive = ACTIVE_STATUSES.includes(o.status);
       const willActive = ACTIVE_STATUSES.includes(status);
       const slot = { TableName: META_TABLE, Key: { pk: slotKey(o.orderNumber) } };

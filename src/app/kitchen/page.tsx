@@ -16,15 +16,13 @@ export default function KitchenPage() {
   useEffect(() => {
     const unsubscribe = subscribeActiveOrders((active) => {
       setOrders(active);
-      // 呼出中から調理中に戻ったものは新規ではないので、調理中・呼出中の全体で新しく現れたものだけ見る
-      const newIds = new Set(findNewOrders(active.map((order) => order.id)));
-      if (active.some((order) => newIds.has(order.id) && order.status === "cooking")) playNewOrderSound();
+      if (findNewOrders(active.map((order) => order.id)).length > 0) playNewOrderSound();
     });
     return unsubscribe;
   }, [findNewOrders, playNewOrderSound]);
 
-  async function toReady(order: Order) {
-    await setOrderStatus(order.id, "ready");
+  async function toCompleted(order: Order) {
+    await setOrderStatus(order.id, "completed");
   }
 
   const cookingOrders = orders.filter((order) => order.status === "cooking");
@@ -39,7 +37,7 @@ export default function KitchenPage() {
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 content-start">
             {cookingOrders.map((order) => (
-              <OrderCard key={order.id} order={order} onAdvance={toReady} />
+              <OrderCard key={order.id} order={order} onAdvance={toCompleted} />
             ))}
           </div>
         )}
@@ -100,7 +98,7 @@ function OrderCard({ order, onAdvance }: { order: Order; onAdvance: (order: Orde
         onClick={() => onAdvance(order)}
         className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 rounded-lg bg-emerald-600 text-white font-bold whitespace-nowrap text-xs sm:text-sm lg:text-base px-2.5 py-1 sm:px-3 active:opacity-80"
       >
-        呼出中に
+        受け渡し完了
       </button>
     </div>
   );

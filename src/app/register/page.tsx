@@ -20,16 +20,14 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
-  const [readyOrders, setReadyOrders] = useState<Order[]>([]);
   const [cookingOrders, setCookingOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     return subscribeAllOrders((orders) => {
-      // 会計ミスの取消対象は調理中の注文だけ（呼出中・受け渡し完了・取消済みは出さない）
+      // 会計ミスの取消対象は調理中の注文だけ（受け渡し完了・取消済みは出さない）
       const cooking = orders.filter((order) => order.status === "cooking");
       setRecentOrders(cooking.slice(-5).reverse());
       setCookingOrders(cooking);
-      setReadyOrders(orders.filter((order) => order.status === "ready"));
     });
   }, []);
 
@@ -116,7 +114,7 @@ export default function RegisterPage() {
       )}
 
       {/* セット数の入力と注文内容の確認を 1 つのパネルにまとめる。
-          スマホ・タブレットは呼出中・直近の注文の下に置き、画面下に貼り付けて上に重ねる */}
+          スマホ・タブレットは調理中・直近の注文の下に置き、画面下に貼り付けて上に重ねる */}
       <section className="order-last sticky bottom-3 z-20 lg:order-none lg:static rounded-2xl bg-white border border-neutral-300 shadow-lg px-4 sm:px-5 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm sm:text-base font-semibold text-neutral-600">注文内容確認</h2>
@@ -235,13 +233,13 @@ export default function RegisterPage() {
 
       <div className="lg:contents grid grid-cols-1 gap-4 bg-white border border-neutral-300 rounded-2xl shadow-lg p-3 sm:p-4 lg:p-0 lg:bg-transparent lg:border-0 lg:shadow-none">
         <section className="flex flex-col gap-2 min-h-0 overflow-y-auto lg:fixed lg:top-12 lg:bottom-0 lg:right-0 lg:w-[20vw] lg:bg-white lg:border-l lg:border-neutral-300 lg:shadow-lg lg:p-4">
-          <h2 className="text-sm sm:text-base font-semibold text-emerald-700">
-            🔔 呼出中（受け渡し完了）
+          <h2 className="text-sm sm:text-base font-semibold text-orange-600">
+            🔥 調理中（受け渡し完了）
           </h2>
-          {readyOrders.length === 0 && <p className="text-sm sm:text-base text-neutral-400">No 注文</p>}
+          {cookingOrders.length === 0 && <p className="text-sm sm:text-base text-neutral-400">No 注文</p>}
           {/* スマホ・タブレットは番号を 2 列で並べる。スマホは 4 行（8 件）分の高さまでで、それ以上はスクロール */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 max-h-[8.5rem] overflow-y-auto sm:max-h-none sm:overflow-visible lg:flex lg:flex-col">
-            {readyOrders.map((order) => (
+            {cookingOrders.map((order) => (
               <div key={order.id} className="h-7 sm:h-auto flex items-center justify-between gap-2">
                 <span className="font-mono font-bold text-lg sm:text-2xl">
                   {String(order.orderNumber).padStart(3, "0")}
@@ -255,18 +253,6 @@ export default function RegisterPage() {
                 </button>
               </div>
             ))}
-          </div>
-          {/* スマホは調理中の番号もここに並べ、全体の進み具合を一目で見られるようにする */}
-          <div className="sm:hidden border-t border-neutral-200 pt-2 flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-orange-600">🔥 調理中</h3>
-            {cookingOrders.length === 0 && <p className="text-sm text-neutral-400">No 注文</p>}
-            <div className="flex flex-wrap gap-x-3 gap-y-1 max-h-[4.5rem] overflow-y-auto">
-              {cookingOrders.map((order) => (
-                <span key={order.id} className="font-mono font-bold text-lg text-neutral-500">
-                  {String(order.orderNumber).padStart(3, "0")}
-                </span>
-              ))}
-            </div>
           </div>
         </section>
 

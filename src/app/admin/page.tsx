@@ -28,7 +28,7 @@ export default function AdminPage() {
     return unsubscribe;
   }, []);
 
-  // 受け渡し完了した注文だけを履歴・売上の対象にする（レジでの会計ミス取消や調理中・呼出中は含めない）
+  // 受け渡し完了した注文だけを履歴・売上の対象にする（レジでの会計ミス取消や調理中は含めない）
   const completed = useMemo(
     () =>
       orders
@@ -50,9 +50,9 @@ export default function AdminPage() {
     return { totalAmount, countByMenu };
   }, [completed]);
 
-  // 受け渡しを押し間違えたときに呼出中へ戻す（履歴・売上からも外れる）
-  async function handleBackToReady(order: Order) {
-    await setOrderStatus(order.id, "ready");
+  // 受け渡しを押し間違えたときに調理中へ戻す（履歴・売上からも外れる）
+  async function handleBackToCooking(order: Order) {
+    await setOrderStatus(order.id, "cooking");
   }
 
   async function handleResetCounter() {
@@ -151,10 +151,10 @@ export default function AdminPage() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => handleBackToReady(order)}
-                  className="shrink-0 whitespace-nowrap rounded-lg bg-emerald-100 text-emerald-700 font-bold text-sm sm:text-base px-2.5 py-1 sm:px-4 sm:py-2 active:bg-emerald-200"
+                  onClick={() => handleBackToCooking(order)}
+                  className="shrink-0 whitespace-nowrap rounded-lg bg-orange-100 text-orange-700 font-bold text-sm sm:text-base px-2.5 py-1 sm:px-4 sm:py-2 active:bg-orange-200"
                 >
-                  呼出中に戻す
+                  調理中に戻す
                 </button>
               </li>
             ))}
