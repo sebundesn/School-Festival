@@ -123,6 +123,12 @@ export default function AdminPage() {
                 key={order.id}
                 className="flex items-center gap-2 sm:gap-4 border-b last:border-b-0 border-neutral-200 py-1.5 sm:py-2"
               >
+                <span className="w-10 sm:w-12 shrink-0 font-mono font-bold text-base sm:text-lg tabular-nums">
+                  {formatNumber(order.orderNumber)}
+                </span>
+                <span className="flex-1 min-w-0 text-sm sm:text-base">
+                  {order.items.map((item) => `${item.name}×${item.quantity}`).join("　")}
+                </span>
                 <button
                   type="button"
                   onClick={() => handleDelete(order)}
@@ -130,9 +136,6 @@ export default function AdminPage() {
                 >
                   削除
                 </button>
-                <span className="flex-1 min-w-0 text-sm sm:text-base">
-                  {order.items.map((item) => `${item.name}×${item.quantity}`).join("　")}
-                </span>
               </li>
             ))}
           </ul>
